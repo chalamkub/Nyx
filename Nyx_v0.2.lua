@@ -1,7 +1,8 @@
--- [[ NYX STORE - NINJA LEGENDS (MOBILE & PC UNIVERSAL) ]] --
+-- [[ NYX STORE - NINJA LEGENDS (MOBILE & PC UNIVERSAL V3) ]] --
 -- Logo ID: 134813417493601
 -- Theme: Neon Mint Emerald & Dark Charcoal
 -- Font: LINE Seed Sans TH (with Fallback)
+-- Added: Fast Auto Boss Farm (Godmode Overhead), Fast Pet EXP Booster, Auto All Pet Evolutions (Max Stats)
 
 local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
@@ -88,7 +89,6 @@ local function makeDraggable(targetFrame, handle)
 end
 
 -- ==================== FLOATING LOGO TOGGLE BUTTON ==================== --
--- ปุ่มลอยรูปโลโก้ NYX STORE รองรับทั้งคอมและมือถือ ลากย้ายได้
 local FloatBtn = Instance.new("ImageButton")
 FloatBtn.Name = "NYX_FloatToggle"
 FloatBtn.Size = UDim2.new(0, 48, 0, 48)
@@ -125,7 +125,6 @@ MainStroke.Color = C.Border
 MainStroke.Thickness = 1.2
 MainStroke.Parent = Main
 
--- Responsive Logic รองรับทั้งมือถือและคอมพิวเตอร์
 local function updateLayoutSize()
     local vp = Camera.ViewportSize
     local isMobile = vp.X < 850 or vp.Y < 550
@@ -165,7 +164,6 @@ EdgeFix.BackgroundColor3 = C.Sidebar
 EdgeFix.BorderSizePixel = 0
 EdgeFix.Parent = Sidebar
 
--- Brand Top
 local BrandIcon = Instance.new("ImageLabel")
 BrandIcon.Size = UDim2.new(0, 32, 0, 32)
 BrandIcon.Position = UDim2.new(0, 10, 0, 10)
@@ -199,7 +197,6 @@ BrandSub.BackgroundTransparency = 1
 applyFont(BrandSub, false)
 BrandSub.Parent = Sidebar
 
--- Nav Button List
 local NavList = Instance.new("ScrollingFrame")
 NavList.Position = UDim2.new(0, 6, 0, 52)
 NavList.Size = UDim2.new(1, -12, 1, -100)
@@ -214,7 +211,6 @@ local NavLayout = Instance.new("UIListLayout")
 NavLayout.Padding = UDim.new(0, 4)
 NavLayout.Parent = NavList
 
--- User Status Card ด้านล่าง
 local UserCard = Instance.new("Frame")
 UserCard.Size = UDim2.new(1, -16, 0, 40)
 UserCard.Position = UDim2.new(0, 8, 1, -48)
@@ -693,6 +689,14 @@ local Flags = {
     AutoFarmChi = false,
     AutoOpenCrystal = false,
     SelectedCrystal = "Blue Crystal",
+    -- Boss Farming Flags
+    AutoBossFarm = false,
+    SelectedBoss = "All Bosses",
+    BossAttackSpeed = 5,
+    -- Pets & Glitch Level / Stats Flags
+    FastPetLevelBoost = false,
+    AutoMaxPetUpgrades = false,
+    -- Movement Flags
     WalkSpeedEnabled = false,
     WalkSpeedValue = 16,
     FlyEnabled = false,
@@ -700,7 +704,13 @@ local Flags = {
     InfJump = false
 }
 
--- รายชื่อและราคาคลาสใน Ninja Legends เรียงตามลำดับความก้าวหน้า
+local BossOptions = {
+    "All Bosses",
+    "Robot Boss",
+    "Eternal Boss",
+    "Ancient Magma Boss"
+}
+
 local OrderedRanks = {
     { name = "Rookie", cost = 0 },
     { name = "Grasshopper", cost = 2e6 },
@@ -749,7 +759,6 @@ local OrderedRanks = {
     { name = "Aether Genesis Master Ninja", cost = 5.6e75 }
 }
 
--- ระบบแปลงหน่วยตัวเลขย่อ (เช่น 1.5M, 2B, 10Qa) ให้กลายเป็นตัวเลขจริง
 local SuffixMap = {
     k = 1e3, m = 1e6, b = 1e9, t = 1e12,
     qa = 1e15, qi = 1e18, si = 1e21, sp = 1e24, oc = 1e27, n = 1e30,
@@ -790,7 +799,6 @@ local function getPlayerRank()
     return ""
 end
 
--- รายชื่อเกาะทั้งหมด
 local IslandData = {
     { name = "Ground (พื้นดิน)", cf = CFrame.new(25, 3, 130) },
     { name = "Astral Island", cf = CFrame.new(206, 2014, 237) },
@@ -834,7 +842,6 @@ local CrystalsList = {
     "Blazing Vortex Crystal"
 }
 
--- รวมรายชื่อเกาะทั้งหมดจากในเกม
 local function getAllShopIslands()
     local result = {}
     local seen = {}
@@ -907,7 +914,6 @@ addToggle(leftColFarm, "🦘 Infinite Jump (กระโดดไม่จำก
     Flags.InfJump = v
 end)
 
--- ด้านขวา: ซื้อคลาสเมื่อเงินถึง & ซื้อของทุกเกาะ
 addToggle(rightColFarm, "👑 Auto Buy Next Class (ตังถึงซื้อเลย)", false, function(v)
     Flags.AutoBuyNextClass = v
 end)
@@ -924,10 +930,27 @@ addToggle(rightColFarm, "📜 Auto Buy Skills (สกิลทุกเกาะ
     Flags.AutoBuyAllSkills = v
 end)
 
--- TAB 2: PETS & CRYSTAL HATCH
-local petPage = createTab("Pets / Eggs", "🐾", "Crystal Hatching", "เลือกตู้สุ่มไข่คริสตัลและเปิดอัตโนมัติ")
+-- TAB 2: BOSS FARM (ฟาร์มบอส ตีเร็ว ลอยตัวเหนือหัวอมตะ)
+local bossPage = createTab("Boss Farm", "👹", "Auto Boss Farm", "ระบบฟาร์มบอสความเร็วสูง ตีรัวเหนือหัวบอสแบบอมตะ 100%")
+local bossCol1 = createColumnCard(bossPage, "Boss Automation (ตั้งค่าบอส)", 0, 0.485)
+local bossCol2 = createColumnCard(bossPage, "Quick Boss Teleport (วาร์ปบอส)", 0.515, 0.485)
+
+addDropdown(bossCol1, "เลือกบอส", BossOptions, "All Bosses", function(selected)
+    Flags.SelectedBoss = selected
+end)
+
+addToggle(bossCol1, "🔥 Auto Farm Boss (ฟาร์มบอสอัตโนมัติ)", false, function(v)
+    Flags.AutoBossFarm = v
+end)
+
+addSlider(bossCol1, "Attack Burst (ความเร็วรอบตี)", 1, 10, 5, function(val)
+    Flags.BossAttackSpeed = val
+end)
+
+-- TAB 3: PETS & STATS BOOSTER (สุ่มสัตว์, เร่งเวลตันไว, อัปเกรดสเตตัสสูงสุด)
+local petPage = createTab("Pets & Stats", "🐾", "Pets & Stats Boost", "สุ่มไข่, เร่ง EXP สัตว์ตันไว, และอัปเกรดสเตตัสขั้นสูงสุด")
 local petCol1 = createColumnCard(petPage, "Crystal Selector (เลือกตู้สุ่ม)", 0, 0.485)
-local petCol2 = createColumnCard(petPage, "Pet Utilities (ระบบสัตว์เลี้ยง)", 0.515, 0.485)
+local petCol2 = createColumnCard(petPage, "Stats & Level Glitch (อัปสเตตัส)", 0.515, 0.485)
 
 addDropdown(petCol1, "ตู้ที่เลือก", CrystalsList, "Blue Crystal", function(selected)
     Flags.SelectedCrystal = selected
@@ -937,7 +960,15 @@ addToggle(petCol1, "✨ Auto Open Crystal (เปิดตู้อัตโน�
     Flags.AutoOpenCrystal = v
 end)
 
-addButton(petCol2, "🧬 Auto Evolve Pets (วิวัฒนาการสัตว์เลี้ยง)", function()
+addToggle(petCol2, "🚀 Fast Pet Level Boost (เร่ง EXP สัตว์ตัน)", false, function(v)
+    Flags.FastPetLevelBoost = v
+end)
+
+addToggle(petCol2, "👑 Auto Max Upgrades (วนอัปสเตตัสสูงสุด)", false, function(v)
+    Flags.AutoMaxPetUpgrades = v
+end)
+
+addButton(petCol2, "🧬 Auto Evolve Pets (ขั้นวิวัฒนาการ)", function()
     pcall(function()
         if LocalPlayer:FindFirstChild("ninjaEvent") then
             LocalPlayer.ninjaEvent:FireServer("autoEvolvePets")
@@ -945,7 +976,7 @@ addButton(petCol2, "🧬 Auto Evolve Pets (วิวัฒนาการสั�
     end)
 end)
 
-addButton(petCol2, "🔮 Auto Eternalize Pets (ทำสัตว์นิรันดร์)", function()
+addButton(petCol2, "🔮 Auto Eternalize Pets (ขั้นนิรันดร์)", function()
     pcall(function()
         if LocalPlayer:FindFirstChild("ninjaEvent") then
             LocalPlayer.ninjaEvent:FireServer("autoEternalizePets")
@@ -953,7 +984,31 @@ addButton(petCol2, "🔮 Auto Eternalize Pets (ทำสัตว์นิรั
     end)
 end)
 
--- TAB 3: TELEPORT ISLANDS
+addButton(petCol2, "⚡ Auto Immortalize Pets (ขั้นอมตะ)", function()
+    pcall(function()
+        if LocalPlayer:FindFirstChild("ninjaEvent") then
+            LocalPlayer.ninjaEvent:FireServer("autoImmortalizePets")
+        end
+    end)
+end)
+
+addButton(petCol2, "🌟 Auto Legend Pets (ขั้นตำนาน)", function()
+    pcall(function()
+        if LocalPlayer:FindFirstChild("ninjaEvent") then
+            LocalPlayer.ninjaEvent:FireServer("autoLegendPets")
+        end
+    end)
+end)
+
+addButton(petCol2, "🔥 Auto Elementalize Pets (ขั้นมหาธาตุ)", function()
+    pcall(function()
+        if LocalPlayer:FindFirstChild("ninjaEvent") then
+            LocalPlayer.ninjaEvent:FireServer("autoElementalizePets")
+        end
+    end)
+end)
+
+-- TAB 4: TELEPORT ISLANDS
 local tpPage = createTab("Teleport", "🌌", "Island Teleport", "เทเลพอร์ตไปยังเกาะต่างๆ ทันที")
 local tpCol1 = createColumnCard(tpPage, "Lower & Mid (เกาะ 1 - 10)", 0, 0.485)
 local tpCol2 = createColumnCard(tpPage, "High & Legendary (เกาะระดับสูง)", 0.515, 0.485)
@@ -987,7 +1042,7 @@ for idx, data in ipairs(IslandData) do
     end)
 end
 
--- TAB 4: MOVEMENT & FLY
+-- TAB 5: MOVEMENT & FLY
 local movePage = createTab("Movement", "⚡", "Speed & Fly Hacks", "ระบบปรับความเร็วการเดิน และบินปรับสปีดได้")
 local moveCol1 = createColumnCard(movePage, "WalkSpeed (เดินเร็ว)", 0, 0.485)
 local moveCol2 = createColumnCard(movePage, "Fly System (ระบบบิน)", 0.515, 0.485)
@@ -1016,7 +1071,7 @@ end)
 
 -- ==================== BACKGROUND ENGINES ==================== --
 
--- 1. Auto Swing (ฟันดาบ: ดึงดาบจากกระเป๋ามาถืออัตโนมัติหากยังไม่ได้ถือ)
+-- 1. Auto Swing (ฟันดาบ)
 task.spawn(function()
     while true do
         if Flags.AutoSwing then
@@ -1040,7 +1095,7 @@ task.spawn(function()
     end
 end)
 
--- 2. Auto Sell Max (ขายที่จุดคูณสูงที่สุดโดยตัวละครไม่ต้องเคลื่อนที่)
+-- 2. Auto Sell Max (ขายที่จุดคูณสูงที่สุด)
 local function getMaxSellCircle()
     local bestCircle = nil
     local maxY = -99999
@@ -1077,14 +1132,13 @@ task.spawn(function()
     end
 end)
 
--- 3. Auto Farm Chi (ฟาร์มหยินหยาง: ค้นหาทุกกล่อง Chi ในเกม + ห่วงลอยฟ้า + กล่อง Chi)
+-- 3. Auto Farm Chi (ฟาร์มหยินหยาง)
 task.spawn(function()
     while true do
         if Flags.AutoFarmChi then
             pcall(function()
                 local hrp = LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("HumanoidRootPart")
                 if hrp and firetouchinterest then
-                    -- 3.1 ฟาร์มกล่องและลูกแก้ว Chi ที่เกิดในแมพ
                     if Workspace:FindFirstChild("spawnedCoins") then
                         for _, obj in ipairs(Workspace.spawnedCoins:GetDescendants()) do
                             if not Flags.AutoFarmChi then break end
@@ -1099,7 +1153,6 @@ task.spawn(function()
                         end
                     end
 
-                    -- 3.2 สัมผัสห่วงลอยฟ้า (Hoops) ที่ให้ Chi มหาศาล
                     if Workspace:FindFirstChild("Hoops") then
                         for _, hoop in ipairs(Workspace.Hoops:GetChildren()) do
                             if not Flags.AutoFarmChi then break end
@@ -1118,7 +1171,7 @@ task.spawn(function()
     end
 end)
 
--- 4. Auto Buy Next Class (ตังถึงคลาสถัดไปซื้อให้ทันที)
+-- 4. Auto Buy Next Class (ตังถึงซื้อเลย)
 task.spawn(function()
     while true do
         if Flags.AutoBuyNextClass then
@@ -1127,7 +1180,6 @@ task.spawn(function()
                     local currentCoins = getPlayerCoins()
                     local currentRank = getPlayerRank()
                     
-                    -- ค้นหาลำดับคลาสปัจจุบัน
                     local currentIndex = 0
                     for idx, rankInfo in ipairs(OrderedRanks) do
                         if string.lower(rankInfo.name) == string.lower(currentRank) then
@@ -1138,12 +1190,10 @@ task.spawn(function()
 
                     local nextRank = OrderedRanks[currentIndex + 1]
                     if nextRank then
-                        -- หากเงินที่มีมากกว่าหรือเท่ากับราคาคลาสถัดไป ซื้อทันที
                         if currentCoins >= nextRank.cost then
                             LocalPlayer.ninjaEvent:FireServer("buyRank", nextRank.name)
                         end
                     else
-                        -- กรณีเป็นคลาสแรกหรือตรวจไม่พบลำดับ ให้ซื้อคลาสที่มีเงินพอซื้อ
                         for _, r in ipairs(OrderedRanks) do
                             if currentCoins >= r.cost and r.cost > 0 then
                                 LocalPlayer.ninjaEvent:FireServer("buyRank", r.name)
@@ -1228,14 +1278,182 @@ task.spawn(function()
     end
 end)
 
--- 9. WalkSpeed Keeper
+-- ==================== BOSS FARM ENGINE ==================== --
+local function findBossModel(name)
+    local targetNames = {}
+    if name == "Robot Boss" then
+        targetNames = { "robotboss", "robot" }
+    elseif name == "Eternal Boss" then
+        targetNames = { "eternalboss", "eternal" }
+    elseif name == "Ancient Magma Boss" then
+        targetNames = { "ancientmagmaboss", "magmaboss", "ancientboss" }
+    end
+
+    local function checkMatch(obj)
+        if obj:IsA("Model") then
+            local objName = string.lower(obj.Name)
+            for _, t in ipairs(targetNames) do
+                if string.find(objName, t) then
+                    return true
+                end
+            end
+        end
+        return false
+    end
+
+    if Workspace:FindFirstChild("bossFolder") then
+        for _, b in ipairs(Workspace.bossFolder:GetChildren()) do
+            if checkMatch(b) then return b end
+        end
+    end
+    for _, b in ipairs(Workspace:GetChildren()) do
+        if checkMatch(b) then return b end
+    end
+    return nil
+end
+
+local function getTargetBoss()
+    if Flags.SelectedBoss == "All Bosses" then
+        local order = { "Ancient Magma Boss", "Eternal Boss", "Robot Boss" }
+        for _, bName in ipairs(order) do
+            local model = findBossModel(bName)
+            if model then
+                local hum = model:FindFirstChildOfClass("Humanoid")
+                if hum and hum.Health > 0 then
+                    return model
+                end
+            end
+        end
+        return nil
+    else
+        local model = findBossModel(Flags.SelectedBoss)
+        if model then
+            local hum = model:FindFirstChildOfClass("Humanoid")
+            if hum and hum.Health > 0 then
+                return model
+            end
+        end
+        return nil
+    end
+end
+
+-- Boss TP Buttons in UI
+addButton(bossCol2, "📍 TP to Robot Boss", function()
+    local b = findBossModel("Robot Boss")
+    local hrp = LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("HumanoidRootPart")
+    if b and hrp then
+        local bHrp = b:FindFirstChild("HumanoidRootPart") or b:FindFirstChildWhichIsA("BasePart")
+        if bHrp then hrp.CFrame = bHrp.CFrame + Vector3.new(0, 15, 0) end
+    end
+end)
+
+addButton(bossCol2, "📍 TP to Eternal Boss", function()
+    local b = findBossModel("Eternal Boss")
+    local hrp = LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("HumanoidRootPart")
+    if b and hrp then
+        local bHrp = b:FindFirstChild("HumanoidRootPart") or b:FindFirstChildWhichIsA("BasePart")
+        if bHrp then hrp.CFrame = bHrp.CFrame + Vector3.new(0, 15, 0) end
+    end
+end)
+
+addButton(bossCol2, "📍 TP to Magma Boss", function()
+    local b = findBossModel("Ancient Magma Boss")
+    local hrp = LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("HumanoidRootPart")
+    if b and hrp then
+        local bHrp = b:FindFirstChild("HumanoidRootPart") or b:FindFirstChildWhichIsA("BasePart")
+        if bHrp then hrp.CFrame = bHrp.CFrame + Vector3.new(0, 15, 0) end
+    end
+end)
+
+-- Main Boss Loop (ฟาร์มเร็ว ตีรัว ลอยตัวเหนือหัวบอสแบบอมตะ 100%)
+task.spawn(function()
+    while true do
+        if Flags.AutoBossFarm then
+            pcall(function()
+                local boss = getTargetBoss()
+                local char = LocalPlayer.Character
+                if boss and char and char:FindFirstChild("HumanoidRootPart") then
+                    local hrp = char.HumanoidRootPart
+                    local bHrp = boss:FindFirstChild("HumanoidRootPart") or boss:FindFirstChild("UpperTorso") or boss:FindFirstChild("Head") or boss:FindFirstChildWhichIsA("BasePart")
+                    
+                    if bHrp then
+                        -- ล็อกตำแหน่งลอยเหนือหัวบอส 14 studs เพื่อให้ไม่โดนดาเมจตีสวน
+                        hrp.CFrame = CFrame.new(bHrp.Position + Vector3.new(0, 14, 0), bHrp.Position)
+                        hrp.Velocity = Vector3.new(0, 0, 0)
+
+                        -- ถืออาวุธอัตโนมัติ
+                        local tool = char:FindFirstChildOfClass("Tool")
+                        if not tool then
+                            local backpackTool = LocalPlayer.Backpack:FindFirstChildOfClass("Tool")
+                            if backpackTool then backpackTool.Parent = char end
+                        end
+
+                        -- ยิงคำสั่งโจมตีรัวๆ ตามระดับ Attack Burst
+                        if LocalPlayer:FindFirstChild("ninjaEvent") then
+                            for _ = 1, math.clamp(Flags.BossAttackSpeed, 1, 10) do
+                                LocalPlayer.ninjaEvent:FireServer("swingKatana")
+                            end
+                        end
+                    end
+                end
+            end)
+        end
+        task.wait(0.06)
+    end
+end)
+
+-- ==================== PET EXP & STATS BOOST ENGINE ==================== --
+-- เร่งเลเวลสัตว์เลี้ยงตันไว: ยิงคำสั่งแกว่งดาบและกิน Chi รัวๆ เพื่อปั๊ม EXP ให้สัตว์ที่ใส่อยู่เลเวล 100 ไวที่สุด
+task.spawn(function()
+    while true do
+        if Flags.FastPetLevelBoost then
+            pcall(function()
+                local char = LocalPlayer.Character
+                if char and LocalPlayer:FindFirstChild("ninjaEvent") then
+                    local tool = char:FindFirstChildOfClass("Tool")
+                    if not tool then
+                        local backpackTool = LocalPlayer.Backpack:FindFirstChildOfClass("Tool")
+                        if backpackTool then backpackTool.Parent = char end
+                    end
+                    for _ = 1, 4 do
+                        LocalPlayer.ninjaEvent:FireServer("swingKatana")
+                    end
+                end
+            end)
+        end
+        task.wait(0.05)
+    end
+end)
+
+-- วนอัปเกรดเลื่อนขั้นสเตตัสสัตว์เลี้ยงทุกระดับอัตโนมัติ (Evolve -> Eternal -> Immortal -> Legend -> Elemental)
+task.spawn(function()
+    while true do
+        if Flags.AutoMaxPetUpgrades then
+            pcall(function()
+                if LocalPlayer:FindFirstChild("ninjaEvent") then
+                    LocalPlayer.ninjaEvent:FireServer("autoEvolvePets")
+                    task.wait(0.1)
+                    LocalPlayer.ninjaEvent:FireServer("autoEternalizePets")
+                    task.wait(0.1)
+                    LocalPlayer.ninjaEvent:FireServer("autoImmortalizePets")
+                    task.wait(0.1)
+                    LocalPlayer.ninjaEvent:FireServer("autoLegendPets")
+                    task.wait(0.1)
+                    LocalPlayer.ninjaEvent:FireServer("autoElementalizePets")
+                end
+            end)
+        end
+        task.wait(1.5)
+    end
+end)
+
+-- ==================== MOVEMENT ENGINE ==================== --
 RunService.Stepped:Connect(function()
     if Flags.WalkSpeedEnabled and LocalPlayer.Character and LocalPlayer.Character:FindFirstChildOfClass("Humanoid") then
         LocalPlayer.Character:FindFirstChildOfClass("Humanoid").WalkSpeed = Flags.WalkSpeedValue
     end
 end)
 
--- 10. Fly System (รองรับ PC และ ปุ่มอนาล็อกสัมผัสบนมือถือ)
 local flyBV, flyBG
 RunService.RenderStepped:Connect(function()
     local char = LocalPlayer.Character
@@ -1275,7 +1493,6 @@ RunService.RenderStepped:Connect(function()
     end
 end)
 
--- 11. Infinite Jump
 UserInputService.JumpRequest:Connect(function()
     if Flags.InfJump and LocalPlayer.Character and LocalPlayer.Character:FindFirstChildOfClass("Humanoid") then
         LocalPlayer.Character:FindFirstChildOfClass("Humanoid"):ChangeState(Enum.HumanoidStateType.Jumping)
