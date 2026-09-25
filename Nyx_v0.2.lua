@@ -1313,1067 +1313,122 @@ QuestNeta = function()
     }
 end
 
---// NYX UI
---// Redesigned to match the reference: dark glass panels + neon mint/green accent.
---// The existing Tabs:AddToggle/AddButton/AddDropdown/... API is kept so the
---// automation code below does not need to be rewritten.
-local Players = game:GetService("Players")
-local TweenService = game:GetService("TweenService")
-local UIS = game:GetService("UserInputService")
-local CoreGui = game:GetService("CoreGui")
+local redzlib = loadstring(game:HttpGet("https://raw.githubusercontent.com/tlredz/Library/refs/heads/main/redz-V5-remake/main.luau"))()
 
-local LocalPlayerUI = Players.LocalPlayer
+-- ========== NYX STORE THEME (Green Neon from Logo) ==========
+local NyxGreen = Color3.fromRGB(0, 255, 170)
+local NyxGreenDark = Color3.fromRGB(0, 180, 120)
+local NyxGreenDeep = Color3.fromRGB(0, 140, 100)
+local NyxBg = Color3.fromRGB(18, 20, 24)
+local NyxBg2 = Color3.fromRGB(24, 26, 32)
+local NyxStroke = Color3.fromRGB(40, 45, 55)
 
-local NYX = {
-    Logo = "rbxassetid://134813417493601",
-    Title = "NYX HUB",
-    Subtitle = "Blox Fruits",
-    SaveFolder = "nyx-hub.json",
-
-    BG = Color3.fromRGB(4, 13, 11),
-    Sidebar = Color3.fromRGB(6, 20, 17),
-    Panel = Color3.fromRGB(8, 27, 22),
-    Card = Color3.fromRGB(10, 34, 27),
-    CardHover = Color3.fromRGB(13, 44, 34),
-    Accent = Color3.fromRGB(61, 255, 176),
-    Accent2 = Color3.fromRGB(21, 205, 137),
-    Text = Color3.fromRGB(238, 255, 248),
-    Muted = Color3.fromRGB(139, 174, 162),
-    Stroke = Color3.fromRGB(20, 67, 53),
-    Off = Color3.fromRGB(32, 55, 48),
-}
-
-local function New(className, props)
-    local obj = Instance.new(className)
-    for k, v in pairs(props or {}) do
-        obj[k] = v
-    end
-    return obj
-end
-
-local function Corner(parent, radius)
-    local c = Instance.new("UICorner")
-    c.CornerRadius = UDim.new(0, radius or 10)
-    c.Parent = parent
-    return c
-end
-
-local function Stroke(parent, color, thickness, transparency)
-    local s = Instance.new("UIStroke")
-    s.Color = color or NYX.Stroke
-    s.Thickness = thickness or 1
-    s.Transparency = transparency or 0
-    s.ApplyStrokeMode = Enum.ApplyStrokeMode.Border
-    s.Parent = parent
-    return s
-end
-
-local function Padding(parent, left, right, top, bottom)
-    local p = Instance.new("UIPadding")
-    p.PaddingLeft = UDim.new(0, left or 0)
-    p.PaddingRight = UDim.new(0, right or 0)
-    p.PaddingTop = UDim.new(0, top or 0)
-    p.PaddingBottom = UDim.new(0, bottom or 0)
-    p.Parent = parent
-    return p
-end
-
-local function Label(parent, text, size, color, font)
-    return New("TextLabel", {
-        Parent = parent,
-        BackgroundTransparency = 1,
-        Text = text or "",
-        TextColor3 = color or NYX.Text,
-        TextSize = size or 14,
-        Font = font or Enum.Font.Gotham,
-        TextXAlignment = Enum.TextXAlignment.Left,
-        TextYAlignment = Enum.TextYAlignment.Center,
-    })
-end
-
-local function MakeDraggable(frame, handle)
-    handle = handle or frame
-    local dragging = false
-    local dragStart, startPos
-
-    handle.InputBegan:Connect(function(input)
-        if input.UserInputType == Enum.UserInputType.MouseButton1
-        or input.UserInputType == Enum.UserInputType.Touch then
-            dragging = true
-            dragStart = input.Position
-            startPos = frame.Position
-            input.Changed:Connect(function()
-                if input.UserInputState == Enum.UserInputState.End then
-                    dragging = false
-                end
-            end)
-        end
-    end)
-
-    UIS.InputChanged:Connect(function(input)
-        if not dragging then return end
-        if input.UserInputType ~= Enum.UserInputType.MouseMovement
-        and input.UserInputType ~= Enum.UserInputType.Touch then return end
-
-        local delta = input.Position - dragStart
-        frame.Position = UDim2.new(
-            startPos.X.Scale, startPos.X.Offset + delta.X,
-            startPos.Y.Scale, startPos.Y.Offset + delta.Y
-        )
-    end)
-end
-
-local Window = {}
-Window.Tabs = {}
-Window.CurrentTab = nil
-Window.UIScale = 1
-Window._minimized = false
-
-local Gui = New("ScreenGui", {
-    Name = "NYXHubUI",
-    ResetOnSpawn = false,
-    IgnoreGuiInset = true,
-    ZIndexBehavior = Enum.ZIndexBehavior.Sibling,
-})
-Gui.Parent = CoreGui
-
-local Scale = Instance.new("UIScale")
-Scale.Scale = 0.92
-Scale.Parent = Gui
-Window.UIScaleObject = Scale
-
-local Main = New("Frame", {
-    Parent = Gui,
-    Name = "MainWindow",
-    AnchorPoint = Vector2.new(0.5, 0.5),
-    Position = UDim2.fromScale(0.5, 0.5),
-    Size = UDim2.new(0, 980, 0, 590),
-    BackgroundColor3 = NYX.BG,
-    BorderSizePixel = 0,
-})
-Corner(Main, 15)
-Stroke(Main, NYX.Stroke, 1.2, 0)
-
-local TopBar = New("Frame", {
-    Parent = Main,
-    Size = UDim2.new(1, 0, 0, 66),
-    BackgroundColor3 = NYX.Panel,
-    BorderSizePixel = 0,
-})
-Corner(TopBar, 15)
-
--- Cover the bottom corners of the top bar so only the main window owns the rounding.
-New("Frame", {
-    Parent = TopBar,
-    Position = UDim2.new(0, 0, 1, -15),
-    Size = UDim2.new(1, 0, 0, 15),
-    BackgroundColor3 = NYX.Panel,
-    BorderSizePixel = 0,
-})
-
-local Logo = New("ImageLabel", {
-    Parent = TopBar,
-    Position = UDim2.new(0, 16, 0.5, -22),
-    Size = UDim2.fromOffset(44, 44),
-    BackgroundTransparency = 1,
-    Image = NYX.Logo,
-    ScaleType = Enum.ScaleType.Fit,
-})
-Corner(Logo, 12)
-
-local Brand = Label(TopBar, NYX.Title, 19, NYX.Text, Enum.Font.GothamBold)
-Brand.Position = UDim2.new(0, 70, 0, 12)
-Brand.Size = UDim2.new(0, 260, 0, 24)
-
-local BrandSub = Label(TopBar, NYX.Subtitle, 11, NYX.Muted, Enum.Font.GothamMedium)
-BrandSub.Position = UDim2.new(0, 71, 0, 36)
-BrandSub.Size = UDim2.new(0, 260, 0, 18)
-
-local function TopButton(symbol, tooltip)
-    local b = New("TextButton", {
-        Parent = TopBar,
-        Size = UDim2.fromOffset(38, 38),
-        BackgroundColor3 = NYX.Card,
-        Text = symbol,
-        TextColor3 = NYX.Muted,
-        TextSize = 16,
-        Font = Enum.Font.GothamBold,
-        AutoButtonColor = false,
-    })
-    Corner(b, 9)
-    Stroke(b, NYX.Stroke, 1, 0.25)
-    b.MouseEnter:Connect(function()
-        TweenService:Create(b, TweenInfo.new(0.12), {
-            BackgroundColor3 = NYX.CardHover,
-            TextColor3 = NYX.Accent,
-        }):Play()
-    end)
-    b.MouseLeave:Connect(function()
-        TweenService:Create(b, TweenInfo.new(0.12), {
-            BackgroundColor3 = NYX.Card,
-            TextColor3 = NYX.Muted,
-        }):Play()
-    end)
-    return b
-end
-
-local SearchButton = TopButton("⌕", "Search")
-SearchButton.Position = UDim2.new(1, -148, 0.5, -19)
-
-local SettingsButton = TopButton("⚙", "Settings")
-SettingsButton.Position = UDim2.new(1, -104, 0.5, -19)
-
-local MinimizeButton = TopButton("—", "Minimize")
-MinimizeButton.Position = UDim2.new(1, -60, 0.5, -19)
-
-local Body = New("Frame", {
-    Parent = Main,
-    Position = UDim2.new(0, 0, 0, 66),
-    Size = UDim2.new(1, 0, 1, -66),
-    BackgroundTransparency = 1,
-})
-
-local Sidebar = New("Frame", {
-    Parent = Body,
-    Size = UDim2.new(0, 190, 1, 0),
-    BackgroundColor3 = NYX.Sidebar,
-    BorderSizePixel = 0,
-})
-Corner(Sidebar, 12)
-
-local SidebarTitle = Label(Sidebar, "MAIN", 10, NYX.Muted, Enum.Font.GothamBold)
-SidebarTitle.Position = UDim2.new(0, 17, 0, 16)
-SidebarTitle.Size = UDim2.new(1, -34, 0, 18)
-
-local TabList = New("ScrollingFrame", {
-    Parent = Sidebar,
-    Position = UDim2.new(0, 8, 0, 42),
-    Size = UDim2.new(1, -16, 1, -92),
-    BackgroundTransparency = 1,
-    BorderSizePixel = 0,
-    ScrollBarThickness = 2,
-    ScrollBarImageColor3 = NYX.Accent2,
-    CanvasSize = UDim2.new(),
-    AutomaticCanvasSize = Enum.AutomaticSize.Y,
-})
-Padding(TabList, 0, 0, 2, 8)
-
-local TabLayout = Instance.new("UIListLayout")
-TabLayout.Padding = UDim.new(0, 5)
-TabLayout.SortOrder = Enum.SortOrder.LayoutOrder
-TabLayout.Parent = TabList
-
-local UserBox = New("Frame", {
-    Parent = Sidebar,
-    Position = UDim2.new(0, 10, 1, -48),
-    Size = UDim2.new(1, -20, 0, 38),
-    BackgroundColor3 = NYX.Card,
-    BorderSizePixel = 0,
-})
-Corner(UserBox, 9)
-
-local Avatar = New("ImageLabel", {
-    Parent = UserBox,
-    Position = UDim2.new(0, 6, 0.5, -13),
-    Size = UDim2.fromOffset(26, 26),
-    BackgroundTransparency = 1,
-    Image = "rbxthumb://type=AvatarHeadShot&id=" .. tostring(LocalPlayerUI.UserId) .. "&w=150&h=150",
-})
-Corner(Avatar, 50)
-
-local UserName = Label(UserBox, LocalPlayerUI.DisplayName, 11, NYX.Text, Enum.Font.GothamBold)
-UserName.Position = UDim2.new(0, 39, 0, 4)
-UserName.Size = UDim2.new(1, -45, 0, 15)
-UserName.TextTruncate = Enum.TextTruncate.AtEnd
-
-local UserSub = Label(UserBox, "NYX • Blox Fruits", 9, NYX.Muted, Enum.Font.Gotham)
-UserSub.Position = UDim2.new(0, 39, 0, 19)
-UserSub.Size = UDim2.new(1, -45, 0, 12)
-
-local Content = New("Frame", {
-    Parent = Body,
-    Position = UDim2.new(0, 190, 0, 0),
-    Size = UDim2.new(1, -190, 1, 0),
-    BackgroundColor3 = NYX.BG,
-    BorderSizePixel = 0,
-})
-Corner(Content, 12)
-
-local ContentHeader = New("Frame", {
-    Parent = Content,
-    Position = UDim2.new(0, 16, 0, 12),
-    Size = UDim2.new(1, -32, 0, 48),
-    BackgroundTransparency = 1,
-})
-
-local PageTitle = Label(ContentHeader, "Home", 20, NYX.Text, Enum.Font.GothamBold)
-PageTitle.Position = UDim2.new(0, 0, 0, 1)
-PageTitle.Size = UDim2.new(0.7, 0, 0, 24)
-
-local PageSubtitle = Label(ContentHeader, "Control your Blox Fruits automation", 10, NYX.Muted, Enum.Font.Gotham)
-PageSubtitle.Position = UDim2.new(0, 1, 0, 26)
-PageSubtitle.Size = UDim2.new(0.75, 0, 0, 16)
-
-local StatusPill = New("TextLabel", {
-    Parent = ContentHeader,
-    AnchorPoint = Vector2.new(1, 0.5),
-    Position = UDim2.new(1, 0, 0.5, 0),
-    Size = UDim2.fromOffset(96, 28),
-    BackgroundColor3 = Color3.fromRGB(9, 48, 34),
-    Text = "●  ONLINE",
-    TextColor3 = NYX.Accent,
-    TextSize = 10,
-    Font = Enum.Font.GothamBold,
-})
-Corner(StatusPill, 14)
-
-local Pages = New("Frame", {
-    Parent = Content,
-    Position = UDim2.new(0, 14, 0, 66),
-    Size = UDim2.new(1, -28, 1, -78),
-    BackgroundTransparency = 1,
-})
-
-local ToastHolder = New("Frame", {
-    Parent = Gui,
-    AnchorPoint = Vector2.new(1, 0),
-    Position = UDim2.new(1, -18, 0, 18),
-    Size = UDim2.fromOffset(300, 400),
-    BackgroundTransparency = 1,
-})
-local ToastLayout = Instance.new("UIListLayout")
-ToastLayout.HorizontalAlignment = Enum.HorizontalAlignment.Right
-ToastLayout.VerticalAlignment = Enum.VerticalAlignment.Top
-ToastLayout.Padding = UDim.new(0, 8)
-ToastLayout.Parent = ToastHolder
-
-local function Notify(data)
-    data = data or {}
-    local toast = New("Frame", {
-        Parent = ToastHolder,
-        Size = UDim2.new(1, 0, 0, 72),
-        BackgroundColor3 = NYX.Panel,
-        BorderSizePixel = 0,
-    })
-    Corner(toast, 11)
-    Stroke(toast, NYX.Accent2, 1, 0.45)
-
-    local t = Label(toast, tostring(data.Title or "NYX HUB"), 13, NYX.Text, Enum.Font.GothamBold)
-    t.Position = UDim2.new(0, 14, 0, 10)
-    t.Size = UDim2.new(1, -28, 0, 18)
-
-    local c = Label(toast, tostring(data.Content or ""), 10, NYX.Muted, Enum.Font.Gotham)
-    c.Position = UDim2.new(0, 14, 0, 31)
-    c.Size = UDim2.new(1, -28, 0, 30)
-    c.TextWrapped = true
-
-    task.delay(tonumber(data.Duration) or 4, function()
-        if toast and toast.Parent then
-            TweenService:Create(toast, TweenInfo.new(0.2), {
-                BackgroundTransparency = 1
-            }):Play()
-            task.wait(0.2)
-            toast:Destroy()
-        end
-    end)
-end
-
-Window.Notify = Notify
-
-local function SetUIScale(value)
-    Window.UIScale = tonumber(value) or 1
-    Scale.Scale = Window.UIScale
-end
-Window.SetUIScale = SetUIScale
-
-local function ToggleWindow()
-    Window._minimized = not Window._minimized
-    Body.Visible = not Window._minimized
-    Main.Size = Window._minimized
-        and UDim2.new(0, 420, 0, 66)
-        or UDim2.new(0, 980, 0, 590)
-end
-
-MinimizeButton.MouseButton1Click:Connect(ToggleWindow)
-MakeDraggable(Main, TopBar)
-
-local Minimize = {}
-function Minimize:CreateMobileMinimizer(data)
-    local button = New("ImageButton", {
-        Parent = Gui,
-        AnchorPoint = Vector2.new(0, 1),
-        Position = UDim2.new(0, 18, 1, -18),
-        Size = UDim2.fromOffset(54, 54),
-        BackgroundColor3 = NYX.Panel,
-        BorderSizePixel = 0,
-        Image = (data and data.Image) or NYX.Logo,
-        AutoButtonColor = false,
-        Visible = false,
-    })
-    Corner(button, 27)
-    Stroke(button, NYX.Accent, 1.2, 0)
-    button.MouseButton1Click:Connect(function()
-        Main.Visible = true
-        button.Visible = false
-    end)
-    return button
-end
-function Minimize:SetState(value)
-    Main.Visible = not value
-end
-
-function Window:NewMinimizer(data)
-    local key = data and data.KeyCode or Enum.KeyCode.LeftControl
-    UIS.InputBegan:Connect(function(input, processed)
-        if processed then return end
-        if input.KeyCode == key then
-            ToggleWindow()
-        end
-    end)
-    return Minimize
-end
-
-local function SetActiveTab(tab)
-    for _, t in pairs(Window.Tabs) do
-        t.Page.Visible = false
-        t.Button.BackgroundColor3 = NYX.Card
-        t.Button.TextColor3 = NYX.Muted
-        t.Accent.Visible = false
-    end
-
-    tab.Page.Visible = true
-    tab.Button.BackgroundColor3 = Color3.fromRGB(10, 53, 40)
-    tab.Button.TextColor3 = NYX.Text
-    tab.Accent.Visible = true
-    Window.CurrentTab = tab
-
-    PageTitle.Text = tab.Title
-    PageSubtitle.Text = tab.Subtitle or "NYX HUB • Blox Fruits automation"
-end
-
-local function MakeTab(config)
-    config = config or {}
-    local title = tostring(config.Title or "Tab")
-    local icon = tostring(config.Icon or "•")
-
-    local tab = {
-        Title = title,
-        Subtitle = "Manage " .. title,
-        Items = {},
+if redzlib.Themes and redzlib.Themes.Darker then
+    local t = redzlib.Themes.Darker
+    t.Colors.Primary = NyxGreen
+    t.Colors.OnPrimary = NyxGreenDark
+    t.Colors.ScrollBar = NyxGreenDeep
+    t.Colors.JoinButton = NyxGreenDark
+    t.Colors.Link = NyxGreen
+    t.Colors.Stroke = NyxStroke
+    t.Colors.Background = ColorSequence.new{
+        ColorSequenceKeypoint.new(0.00, NyxBg),
+        ColorSequenceKeypoint.new(0.50, NyxBg2),
+        ColorSequenceKeypoint.new(1.00, NyxBg)
     }
-
-    local button = New("TextButton", {
-        Parent = TabList,
-        Size = UDim2.new(1, 0, 0, 38),
-        BackgroundColor3 = NYX.Card,
-        BorderSizePixel = 0,
-        Text = "",
-        AutoButtonColor = false,
-    })
-    Corner(button, 9)
-
-    local accent = New("Frame", {
-        Parent = button,
-        Position = UDim2.new(0, 0, 0.18, 0),
-        Size = UDim2.new(0, 3, 0.64, 0),
-        BackgroundColor3 = NYX.Accent,
-        BorderSizePixel = 0,
-        Visible = false,
-    })
-    Corner(accent, 2)
-
-    local iconLabel = Label(button, "•", 14, NYX.Muted, Enum.Font.GothamBold)
-    iconLabel.Position = UDim2.new(0, 12, 0, 0)
-    iconLabel.Size = UDim2.fromOffset(22, 38)
-    iconLabel.Text = icon:match("rbxassetid") and "◆" or (icon == "Info" and "⌂" or icon == "locate" and "⌖" or icon == "waves" and "≈" or icon == "tent" and "△" or "•")
-
-    local textLabel = Label(button, title, 11, NYX.Muted, Enum.Font.GothamMedium)
-    textLabel.Position = UDim2.new(0, 38, 0, 0)
-    textLabel.Size = UDim2.new(1, -45, 1, 0)
-    textLabel.TextTruncate = Enum.TextTruncate.AtEnd
-
-    local page = New("ScrollingFrame", {
-        Parent = Pages,
-        Size = UDim2.fromScale(1, 1),
-        BackgroundTransparency = 1,
-        BorderSizePixel = 0,
-        ScrollBarThickness = 3,
-        ScrollBarImageColor3 = NYX.Accent2,
-        CanvasSize = UDim2.new(),
-        AutomaticCanvasSize = Enum.AutomaticSize.Y,
-        Visible = false,
-    })
-    Padding(page, 3, 8, 3, 14)
-
-    local layout = Instance.new("UIListLayout")
-    layout.Padding = UDim.new(0, 9)
-    layout.SortOrder = Enum.SortOrder.LayoutOrder
-    layout.Parent = page
-
-    tab.Button = button
-    tab.Accent = accent
-    tab.Page = page
-    tab.Layout = layout
-
-    button.MouseEnter:Connect(function()
-        if Window.CurrentTab ~= tab then
-            TweenService:Create(button, TweenInfo.new(0.12), {
-                BackgroundColor3 = NYX.CardHover
-            }):Play()
-        end
-    end)
-    button.MouseLeave:Connect(function()
-        if Window.CurrentTab ~= tab then
-            TweenService:Create(button, TweenInfo.new(0.12), {
-                BackgroundColor3 = NYX.Card
-            }):Play()
-        end
-    end)
-    button.MouseButton1Click:Connect(function()
-        SetActiveTab(tab)
-    end)
-
-    function tab:AddSection(name)
-        local card = New("Frame", {
-            Parent = page,
-            Size = UDim2.new(1, -8, 0, 38),
-            BackgroundTransparency = 1,
-            BorderSizePixel = 0,
-        })
-
-        local line = New("Frame", {
-            Parent = card,
-            Position = UDim2.new(0, 0, 0.5, -9),
-            Size = UDim2.fromOffset(3, 18),
-            BackgroundColor3 = NYX.Accent,
-            BorderSizePixel = 0,
-        })
-        Corner(line, 2)
-
-        local txt = Label(card, tostring(name or "Section"), 12, NYX.Text, Enum.Font.GothamBold)
-        txt.Position = UDim2.new(0, 11, 0, 0)
-        txt.Size = UDim2.new(1, -11, 1, 0)
-
-        return card
-    end
-
-    local function AddCard(height)
-        local card = New("Frame", {
-            Parent = page,
-            Size = UDim2.new(1, -8, 0, height),
-            BackgroundColor3 = NYX.Card,
-            BorderSizePixel = 0,
-        })
-        Corner(card, 11)
-        Stroke(card, NYX.Stroke, 1, 0.2)
-        return card
-    end
-
-    function tab:AddParagraph(name, desc)
-        local card = AddCard(62)
-        local titleLabel = Label(card, tostring(name or ""), 12, NYX.Text, Enum.Font.GothamBold)
-        titleLabel.Position = UDim2.new(0, 13, 0, 9)
-        titleLabel.Size = UDim2.new(1, -26, 0, 18)
-
-        local descLabel = Label(card, tostring(desc or ""), 10, NYX.Muted, Enum.Font.Gotham)
-        descLabel.Position = UDim2.new(0, 13, 0, 29)
-        descLabel.Size = UDim2.new(1, -26, 0, 24)
-        descLabel.TextWrapped = true
-
-        return {
-            SetDesc = function(_, value)
-                descLabel.Text = tostring(value or "")
-            end,
-            SetTitle = function(_, value)
-                titleLabel.Text = tostring(value or "")
-            end,
-        }
-    end
-
-    function tab:AddButton(data)
-        data = data or {}
-        local card = AddCard(58)
-
-        local titleLabel = Label(card, tostring(data.Name or "Button"), 11, NYX.Text, Enum.Font.GothamBold)
-        titleLabel.Position = UDim2.new(0, 13, 0, 7)
-        titleLabel.Size = UDim2.new(1, -145, 0, 18)
-
-        local descLabel = Label(card, tostring(data.Description or ""), 9, NYX.Muted, Enum.Font.Gotham)
-        descLabel.Position = UDim2.new(0, 13, 0, 27)
-        descLabel.Size = UDim2.new(1, -145, 0, 20)
-        descLabel.TextTruncate = Enum.TextTruncate.AtEnd
-
-        local btn = New("TextButton", {
-            Parent = card,
-            AnchorPoint = Vector2.new(1, 0.5),
-            Position = UDim2.new(1, -12, 0.5, 0),
-            Size = UDim2.fromOffset(108, 34),
-            BackgroundColor3 = Color3.fromRGB(12, 76, 57),
-            BorderSizePixel = 0,
-            Text = "EXECUTE",
-            TextColor3 = NYX.Accent,
-            TextSize = 10,
-            Font = Enum.Font.GothamBold,
-            AutoButtonColor = false,
-        })
-        Corner(btn, 8)
-
-        btn.MouseEnter:Connect(function()
-            TweenService:Create(btn, TweenInfo.new(0.1), {
-                BackgroundColor3 = Color3.fromRGB(18, 104, 76)
-            }):Play()
-        end)
-        btn.MouseLeave:Connect(function()
-            TweenService:Create(btn, TweenInfo.new(0.1), {
-                BackgroundColor3 = Color3.fromRGB(12, 76, 57)
-            }):Play()
-        end)
-        btn.MouseButton1Click:Connect(function()
-            if typeof(data.Callback) == "function" then
-                task.spawn(function()
-                    pcall(data.Callback)
-                end)
-            end
-        end)
-
-        return { SetDesc = function() end }
-    end
-
-    function tab:AddToggle(data)
-        data = data or {}
-        local state = data.Default == true
-        local card = AddCard(58)
-
-        local titleLabel = Label(card, tostring(data.Name or "Toggle"), 11, NYX.Text, Enum.Font.GothamBold)
-        titleLabel.Position = UDim2.new(0, 13, 0, 8)
-        titleLabel.Size = UDim2.new(1, -75, 0, 18)
-
-        local descLabel = Label(card, tostring(data.Description or ""), 9, NYX.Muted, Enum.Font.Gotham)
-        descLabel.Position = UDim2.new(0, 13, 0, 28)
-        descLabel.Size = UDim2.new(1, -75, 0, 18)
-        descLabel.TextTruncate = Enum.TextTruncate.AtEnd
-
-        local switch = New("TextButton", {
-            Parent = card,
-            AnchorPoint = Vector2.new(1, 0.5),
-            Position = UDim2.new(1, -13, 0.5, 0),
-            Size = UDim2.fromOffset(43, 23),
-            BackgroundColor3 = NYX.Off,
-            BorderSizePixel = 0,
-            Text = "",
-            AutoButtonColor = false,
-        })
-        Corner(switch, 12)
-
-        local knob = New("Frame", {
-            Parent = switch,
-            Size = UDim2.fromOffset(17, 17),
-            Position = UDim2.new(0, 3, 0.5, -8.5),
-            BackgroundColor3 = NYX.Muted,
-            BorderSizePixel = 0,
-        })
-        Corner(knob, 50)
-
-        local function RenderToggle()
-            TweenService:Create(switch, TweenInfo.new(0.13), {
-                BackgroundColor3 = state and Color3.fromRGB(12, 103, 74) or NYX.Off
-            }):Play()
-            TweenService:Create(knob, TweenInfo.new(0.13), {
-                Position = state
-                    and UDim2.new(1, -20, 0.5, -8.5)
-                    or UDim2.new(0, 3, 0.5, -8.5),
-                BackgroundColor3 = state and NYX.Accent or NYX.Muted
-            }):Play()
-        end
-
-        local function Set(value)
-            state = value == true
-            RenderToggle()
-            if typeof(data.Callback) == "function" then
-                task.spawn(function()
-                    pcall(data.Callback, state)
-                end)
-            end
-        end
-
-        switch.MouseButton1Click:Connect(function()
-            Set(not state)
-        end)
-
-        RenderToggle()
-
-        return {
-            SetValue = function(_, value) Set(value) end,
-            GetValue = function() return state end,
-            SetDesc = function(_, value) descLabel.Text = tostring(value or "") end,
-        }
-    end
-
-    function tab:AddDropdown(data)
-        data = data or {}
-        local options = data.Options or {}
-        local selected = data.Default
-        if selected == nil then selected = options[1] end
-
-        local card = AddCard(64)
-        local titleLabel = Label(card, tostring(data.Name or "Dropdown"), 11, NYX.Text, Enum.Font.GothamBold)
-        titleLabel.Position = UDim2.new(0, 13, 0, 7)
-        titleLabel.Size = UDim2.new(0.45, 0, 0, 18)
-
-        local dropdown = New("TextButton", {
-            Parent = card,
-            AnchorPoint = Vector2.new(1, 0.5),
-            Position = UDim2.new(1, -12, 0.5, 0),
-            Size = UDim2.new(0.47, 0, 0, 34),
-            BackgroundColor3 = NYX.Panel,
-            BorderSizePixel = 0,
-            Text = tostring(selected or "Select"),
-            TextColor3 = NYX.Muted,
-            TextSize = 10,
-            Font = Enum.Font.GothamMedium,
-            AutoButtonColor = false,
-        })
-        Corner(dropdown, 8)
-        Stroke(dropdown, NYX.Stroke, 1, 0.1)
-        dropdown.TextTruncate = Enum.TextTruncate.AtEnd
-
-        local popup = nil
-        local function ClosePopup()
-            if popup then
-                popup:Destroy()
-                popup = nil
-            end
-        end
-
-        local function OpenPopup()
-            ClosePopup()
-            popup = New("Frame", {
-                Parent = Main,
-                AnchorPoint = Vector2.new(0.5, 0.5),
-                Position = UDim2.fromScale(0.58, 0.5),
-                Size = UDim2.new(0, 300, 0, math.min(360, 82 + (#options * 34))),
-                BackgroundColor3 = NYX.Panel,
-                BorderSizePixel = 0,
-                ZIndex = 100,
-            })
-            Corner(popup, 12)
-            Stroke(popup, NYX.Accent2, 1, 0.15)
-
-            local pTitle = Label(popup, tostring(data.Name or "Select"), 12, NYX.Text, Enum.Font.GothamBold)
-            pTitle.Position = UDim2.new(0, 14, 0, 8)
-            pTitle.Size = UDim2.new(1, -28, 0, 20)
-            pTitle.ZIndex = 101
-
-            local list = New("ScrollingFrame", {
-                Parent = popup,
-                Position = UDim2.new(0, 8, 0, 34),
-                Size = UDim2.new(1, -16, 1, -42),
-                BackgroundTransparency = 1,
-                BorderSizePixel = 0,
-                ScrollBarThickness = 2,
-                ScrollBarImageColor3 = NYX.Accent2,
-                CanvasSize = UDim2.new(),
-                AutomaticCanvasSize = Enum.AutomaticSize.Y,
-                ZIndex = 101,
-            })
-
-            local l = Instance.new("UIListLayout")
-            l.Padding = UDim.new(0, 4)
-            l.Parent = list
-
-            for _, option in ipairs(options) do
-                local opt = New("TextButton", {
-                    Parent = list,
-                    Size = UDim2.new(1, -2, 0, 30),
-                    BackgroundColor3 = tostring(option) == tostring(selected) and Color3.fromRGB(11, 72, 53) or NYX.Card,
-                    BorderSizePixel = 0,
-                    Text = tostring(option),
-                    TextColor3 = tostring(option) == tostring(selected) and NYX.Accent or NYX.Muted,
-                    TextSize = 10,
-                    Font = Enum.Font.GothamMedium,
-                    AutoButtonColor = false,
-                    ZIndex = 102,
-                })
-                Corner(opt, 7)
-                opt.MouseButton1Click:Connect(function()
-                    selected = option
-                    dropdown.Text = tostring(selected)
-                    ClosePopup()
-                    if typeof(data.Callback) == "function" then
-                        task.spawn(function()
-                            pcall(data.Callback, selected)
-                        end)
-                    end
-                end)
-            end
-        end
-
-        dropdown.MouseButton1Click:Connect(OpenPopup)
-
-        return {
-            SetValue = function(_, value)
-                selected = value
-                dropdown.Text = tostring(value)
-            end,
-            GetValue = function() return selected end,
-        }
-    end
-
-    function tab:AddSlider(data)
-        data = data or {}
-        local min = tonumber(data.Min) or 0
-        local max = tonumber(data.Max) or 100
-        local value = tonumber(data.Default) or min
-        local increment = tonumber(data.Increment) or 1
-
-        local card = AddCard(70)
-        local titleLabel = Label(card, tostring(data.Name or "Slider"), 11, NYX.Text, Enum.Font.GothamBold)
-        titleLabel.Position = UDim2.new(0, 13, 0, 8)
-        titleLabel.Size = UDim2.new(0.7, 0, 0, 18)
-
-        local valueLabel = Label(card, tostring(value), 10, NYX.Accent, Enum.Font.GothamBold)
-        valueLabel.AnchorPoint = Vector2.new(1, 0)
-        valueLabel.Position = UDim2.new(1, -13, 0, 8)
-        valueLabel.Size = UDim2.fromOffset(80, 18)
-        valueLabel.TextXAlignment = Enum.TextXAlignment.Right
-
-        local track = New("Frame", {
-            Parent = card,
-            Position = UDim2.new(0, 13, 0, 40),
-            Size = UDim2.new(1, -26, 0, 5),
-            BackgroundColor3 = NYX.Off,
-            BorderSizePixel = 0,
-        })
-        Corner(track, 3)
-
-        local fill = New("Frame", {
-            Parent = track,
-            Size = UDim2.new(math.clamp((value-min)/(max-min), 0, 1), 0, 1, 0),
-            BackgroundColor3 = NYX.Accent2,
-            BorderSizePixel = 0,
-        })
-        Corner(fill, 3)
-
-        local knob = New("TextButton", {
-            Parent = track,
-            AnchorPoint = Vector2.new(0.5, 0.5),
-            Position = UDim2.new(math.clamp((value-min)/(max-min), 0, 1), 0, 0.5, 0),
-            Size = UDim2.fromOffset(14, 14),
-            BackgroundColor3 = NYX.Accent,
-            BorderSizePixel = 0,
-            Text = "",
-            AutoButtonColor = false,
-        })
-        Corner(knob, 50)
-
-        local function Set(v)
-            v = math.clamp(v, min, max)
-            v = math.floor((v - min) / increment + 0.5) * increment + min
-            v = math.clamp(v, min, max)
-            value = v
-            local alpha = max == min and 0 or (v-min)/(max-min)
-            fill.Size = UDim2.new(alpha, 0, 1, 0)
-            knob.Position = UDim2.new(alpha, 0, 0.5, 0)
-            valueLabel.Text = tostring(v)
-            if typeof(data.Callback) == "function" then
-                task.spawn(function()
-                    pcall(data.Callback, v)
-                end)
-            end
-        end
-
-        local dragging = false
-        local function UpdateFromX(x)
-            local alpha = math.clamp((x - track.AbsolutePosition.X) / track.AbsoluteSize.X, 0, 1)
-            Set(min + (max-min)*alpha)
-        end
-
-        track.InputBegan:Connect(function(input)
-            if input.UserInputType == Enum.UserInputType.MouseButton1
-            or input.UserInputType == Enum.UserInputType.Touch then
-                dragging = true
-                UpdateFromX(input.Position.X)
-            end
-        end)
-        UIS.InputChanged:Connect(function(input)
-            if dragging and (input.UserInputType == Enum.UserInputType.MouseMovement
-            or input.UserInputType == Enum.UserInputType.Touch) then
-                UpdateFromX(input.Position.X)
-            end
-        end)
-        UIS.InputEnded:Connect(function(input)
-            if input.UserInputType == Enum.UserInputType.MouseButton1
-            or input.UserInputType == Enum.UserInputType.Touch then
-                dragging = false
-            end
-        end)
-
-        return {
-            SetValue = function(_, v) Set(tonumber(v) or min) end,
-            GetValue = function() return value end,
-        }
-    end
-
-    function tab:AddTextBox(data)
-        data = data or {}
-        local card = AddCard(62)
-
-        local titleLabel = Label(card, tostring(data.Name or "Input"), 11, NYX.Text, Enum.Font.GothamBold)
-        titleLabel.Position = UDim2.new(0, 13, 0, 7)
-        titleLabel.Size = UDim2.new(0.4, 0, 0, 18)
-
-        local box = New("TextBox", {
-            Parent = card,
-            AnchorPoint = Vector2.new(1, 0.5),
-            Position = UDim2.new(1, -12, 0.5, 0),
-            Size = UDim2.new(0.55, 0, 0, 34),
-            BackgroundColor3 = NYX.Panel,
-            BorderSizePixel = 0,
-            Text = "",
-            PlaceholderText = tostring(data.Placeholder or ""),
-            PlaceholderColor3 = NYX.Muted,
-            TextColor3 = NYX.Text,
-            TextSize = 10,
-            Font = Enum.Font.GothamMedium,
-            ClearTextOnFocus = data.ClearOnFocus == true,
-        })
-        Corner(box, 8)
-        Stroke(box, NYX.Stroke, 1, 0.1)
-
-        box.FocusLost:Connect(function()
-            if typeof(data.Callback) == "function" then
-                task.spawn(function()
-                    pcall(data.Callback, box.Text)
-                end)
-            end
-        end)
-
-        return { GetValue = function() return box.Text end }
-    end
-
-    function tab:AddDiscordInvite(data)
-        data = data or {}
-        local card = AddCard(88)
-
-        local image = New("ImageLabel", {
-            Parent = card,
-            Position = UDim2.new(0, 12, 0.5, -27),
-            Size = UDim2.fromOffset(54, 54),
-            BackgroundTransparency = 1,
-            Image = tostring(data.Logo or data.Banner or NYX.Logo),
-            ScaleType = Enum.ScaleType.Fit,
-        })
-        Corner(image, 12)
-
-        local titleLabel = Label(card, tostring(data.Title or "Discord"), 12, NYX.Text, Enum.Font.GothamBold)
-        titleLabel.Position = UDim2.new(0, 77, 0, 12)
-        titleLabel.Size = UDim2.new(1, -190, 0, 18)
-
-        local descLabel = Label(card, tostring(data.Description or ""), 9, NYX.Muted, Enum.Font.Gotham)
-        descLabel.Position = UDim2.new(0, 77, 0, 34)
-        descLabel.Size = UDim2.new(1, -190, 0, 34)
-        descLabel.TextWrapped = true
-
-        local join = New("TextButton", {
-            Parent = card,
-            AnchorPoint = Vector2.new(1, 0.5),
-            Position = UDim2.new(1, -12, 0.5, 0),
-            Size = UDim2.fromOffset(88, 32),
-            BackgroundColor3 = Color3.fromRGB(12, 76, 57),
-            BorderSizePixel = 0,
-            Text = "JOIN",
-            TextColor3 = NYX.Accent,
-            TextSize = 10,
-            Font = Enum.Font.GothamBold,
-            AutoButtonColor = false,
-        })
-        Corner(join, 8)
-        join.MouseButton1Click:Connect(function()
-            if setclipboard and data.Invite then
-                pcall(setclipboard, tostring(data.Invite))
-                Notify({Title = "NYX HUB", Content = "Discord invite copied.", Duration = 3})
-            else
-                Notify({Title = "NYX HUB", Content = tostring(data.Invite or "Discord invite"), Duration = 4})
-            end
-        end)
-
-        return card
-    end
-
-    table.insert(Window.Tabs, tab)
-    return tab
+    t.Colors.Buttons = {
+        Holding = Color3.fromRGB(30, 35, 42),
+        Default = Color3.fromRGB(24, 28, 34)
+    }
+    t.Colors.Border = {
+        Holding = Color3.fromRGB(0, 200, 150),
+        Default = NyxStroke
+    }
+    t.Colors.Slider = {
+        SliderBar = NyxGreen,
+        SliderNumber = Color3.fromRGB(220, 255, 240)
+    }
+    t.Colors.Dropdown = {
+        Holder = Color3.fromRGB(22, 25, 30)
+    }
+    t.Colors.Dialog = {
+        Background = NyxBg2
+    }
 end
 
-Window.MakeTab = MakeTab
+local Window = redzlib:MakeWindow({
+    Title = "Nyx Store",
+    SubTitle = "Blox Fruit • Auto Farm",
+    SaveFolder = "oknaiget.json"
+})
 
-local SearchOpen = false
-local SearchBox
-SearchButton.MouseButton1Click:Connect(function()
-    SearchOpen = not SearchOpen
-    if SearchOpen then
-        if not SearchBox then
-            SearchBox = New("TextBox", {
-                Parent = TopBar,
-                Position = UDim2.new(1, -360, 0.5, -18),
-                Size = UDim2.fromOffset(200, 36),
-                BackgroundColor3 = NYX.Card,
-                BorderSizePixel = 0,
-                PlaceholderText = "Search controls...",
-                PlaceholderColor3 = NYX.Muted,
-                Text = "",
-                TextColor3 = NYX.Text,
-                TextSize = 10,
-                Font = Enum.Font.GothamMedium,
-                ZIndex = 20,
-            })
-            Corner(SearchBox, 9)
-            Stroke(SearchBox, NYX.Stroke, 1, 0.15)
+-- Add Logo to Header (TopBar) - Background already transparent on ImageLabel
+-- หมายเหตุ: ถ้าโลโก้ยังมีวงกลมดำ แสดงว่า asset เองมีพื้นหลังดำฝังอยู่
+-- ถ้าต้องการตัดพื้นหลังดำออก ให้ upload เวอร์ชัน transparent ใหม่แล้วเปลี่ยน ID
+task.defer(function()
+    pcall(function()
+        local elements = Window:GetElements()
+        if not elements or not elements.Components then return end
+        local topBar = elements.Components:FindFirstChild("TopBar")
+        if not topBar then return end
+        
+        local titleLabel = topBar:FindFirstChild("Title")
+        if titleLabel then
+            titleLabel.Position = UDim2.new(0, 42, 0.5, 0)
         end
-        SearchBox.Visible = true
-        SearchBox:CaptureFocus()
-    elseif SearchBox then
-        SearchBox.Visible = false
-    end
+        
+        local logo = Instance.new("ImageLabel")
+        logo.Name = "NyxLogo"
+        logo.Size = UDim2.fromOffset(26, 26)
+        logo.Position = UDim2.new(0, 8, 0.5, 0)
+        logo.AnchorPoint = Vector2.new(0, 0.5)
+        logo.BackgroundTransparency = 1          -- ไม่มีพื้นหลังจาก ImageLabel
+        logo.BackgroundColor3 = Color3.new(0,0,0)
+        logo.Image = "rbxassetid://134813417493601"
+        logo.ImageTransparency = 0
+        logo.ScaleType = Enum.ScaleType.Fit
+        logo.Parent = topBar
+        
+        -- ทำให้เป็นวงกลมสะอาด (ถ้า asset มีขอบเหลี่ยม)
+        local corner = Instance.new("UICorner")
+        corner.CornerRadius = UDim.new(1, 0)   -- fully circular
+        corner.Parent = logo
+    end)
 end)
 
-SettingsButton.MouseButton1Click:Connect(function()
-    for _, tab in ipairs(Window.Tabs) do
-        if tab.Title == "Settings" then
-            SetActiveTab(tab)
-            break
-        end
-    end
-end)
+local Minimizer = Window:NewMinimizer({
+  KeyCode = Enum.KeyCode.LeftControl
+})
 
--- Keep the original variable/API names used by the rest of the script.
+local MobileButton = Minimizer:CreateMobileMinimizer({
+  Image = "rbxassetid://134813417493601",
+  BackgroundColor3 = Color3.fromRGB(0, 255, 170)
+})
+
 local Tabs = {
     Info = Window:MakeTab({ Title = "Home", Icon = "Info" }),
-    Main = Window:MakeTab({ Title = "Auto Farm", Icon = "⚙" }),
-    Combat = Window:MakeTab({ Title = "Upgrades & Progression", Icon = "↗" }),
-    Quests = Window:MakeTab({ Title = "Quests & Boosts", Icon = "☆" }),
-    Misc = Window:MakeTab({ Title = "Misc", Icon = "⌁" }),
-    Settings = Window:MakeTab({ Title = "Settings", Icon = "⚙" }),
-    Fish = Window:MakeTab({ Title = "Fishing", Icon = "≈" }),
-    SeaEvent = Window:MakeTab({ Title = "Sea Events", Icon = "≈" }),
-    Race = Window:MakeTab({ Title = "Race", Icon = "◇" }),
-    Prehistoric = Window:MakeTab({ Title = "Prehistoric", Icon = "△" }),
-    Esp = Window:MakeTab({ Title = "ESP", Icon = "◎" }),
-    Raids = Window:MakeTab({ Title = "Raids", Icon = "◈" }),
-    Travel = Window:MakeTab({ Title = "Teleport", Icon = "⌖" }),
-    Shop = Window:MakeTab({ Title = "Shop", Icon = "$" }),
+    Main = Window:MakeTab({ Title = "AutoFarm", Icon = "rbxassetid://7733960981" }),
+    Settings = Window:MakeTab({ Title = "Settings", Icon = "rbxassetid://7734053495" }),
+    Fish = Window:MakeTab({ Title = "Fishing", Icon = "rbxassetid://127664059821666" }),
+    Quests = Window:MakeTab({ Title = "Quests", Icon = "rbxassetid://13075622619" }),
+    SeaEvent = Window:MakeTab({ Title = "Sea Event", Icon = "waves" }),
+    Race = Window:MakeTab({ Title = "Race", Icon = "rbxassetid://11162889532" }),
+    Prehistoric = Window:MakeTab({ Title = "Volcano", Icon = "tent" }),
+    Esp = Window:MakeTab({ Title = "Stats & ESP", Icon = "rbxassetid://7040410130" }),
+    Raids = Window:MakeTab({ Title = "Fruit & Raid", Icon = "rbxassetid://11155986081" }),
+    Combat = Window:MakeTab({ Title = "Player", Icon = "rbxassetid://13075651575" }),
+    Travel = Window:MakeTab({ Title = "Teleport", Icon = "locate" }),
+    Shop = Window:MakeTab({ Title = "Shop", Icon = "rbxassetid://6031265976" }),
+    Misc = Window:MakeTab({ Title = "Misc", Icon = "rbxassetid://10709783577" })
 }
 
--- Default to Home.
-SetActiveTab(Window.Tabs[1])
-
---// END NYX UI
 Tabs.Info:AddSection("Information")
 
 Tabs.Info:AddDiscordInvite({
-	Title = "OK Hub | Community",
-	Description = "A community for OK Hub Users - official scripts, updates, and suport in one place.",
-	Banner = "rbxassetid://127632820302449", 
-	Logo = "rbxassetid://127632820302449",
+	Title = "Nyx Store | Community",
+	Description = "Official Nyx Store community - scripts, updates & support.",
+	Banner = "rbxassetid://134813417493601", 
+	Logo = "rbxassetid://134813417493601",
 	Invite = "https://discord.gg/HJbtKcHAw",
 	Members = 36, 
 	Online = 67, 
@@ -13014,8 +12069,8 @@ end
 StartMainLoops()
 
 Window:Notify({
-  Title = "OK Hub",
-  Content = "OK hub da comeback",
-  Image = "rbxassetid://127632820302449",
+  Title = "Nyx Store",
+  Content = "Nyx Store loaded successfully • Enjoy!",
+  Image = "rbxassetid://134813417493601",
   Duration = 5
 })
