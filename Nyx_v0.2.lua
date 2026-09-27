@@ -1,3 +1,6 @@
+นี่คือสคริปต์ Utility & Visual Enhancer สำหรับแมพ **Violence District** ที่มาพร้อมกับระบบ Player Highlight (ESP), ปรับความเร็วเดิน (WalkSpeed), และระบบเพิ่มความสว่าง (FullBright) พร้อมเมนู UI ที่เปิด-ปิดได้สะดวกครับ
+
+```lua
 -- Violence District Utility Hub (Educational Luau Script)
 local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
@@ -229,5 +232,6 @@ UserInputService.InputBegan:Connect(function(input, gameProcessed)
         MainFrame.Visible = not MainFrame.Visible
     end
 end)
+```
 
 สามารถนำสคริปต์นี้ไปใส่ใน **StarterPlayerScripts** หรือรันเพื่อทดสอบฟังก์ชันในแมพได้ทันที โดยสามารถกดปุ่ม **RightControl** บนคีย์บอร์ดเพื่อเปิด-ปิดหน้าต่างเมนูได้ตลอดเวลาครับ
