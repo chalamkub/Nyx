@@ -1,1503 +1,1286 @@
--- [[ NYX STORE - NINJA LEGENDS (MOBILE & PC UNIVERSAL V3) ]] --
--- Logo ID: 134813417493601
--- Theme: Neon Mint Emerald & Dark Charcoal
--- Font: LINE Seed Sans TH (with Fallback)
--- Added: Fast Auto Boss Farm (Godmode Overhead), Fast Pet EXP Booster, Auto All Pet Evolutions (Max Stats)
+--// Open Sea For Animals
+--// UI VERSION
+--// Tabs / dropdowns / toggles / sliders are UI-only.
+--// No Auto Farm, Teleport, RemoteEvent, or game automation is included.
 
 local Players = game:GetService("Players")
-local RunService = game:GetService("RunService")
 local TweenService = game:GetService("TweenService")
 local UserInputService = game:GetService("UserInputService")
-local Workspace = game:GetService("Workspace")
-local Camera = Workspace.CurrentCamera
-local LocalPlayer = Players.LocalPlayer
 
--- ลบ UI ตัวเก่าออกหากเคยรันอยู่
-if game:GetService("CoreGui"):FindFirstChild("NyxStoreUniversalNinja") then
-    game:GetService("CoreGui").NyxStoreUniversalNinja:Destroy()
-end
+local Player = Players.LocalPlayer
+local PlayerGui = Player:WaitForChild("PlayerGui")
 
--- ==================== THEME & FONTS ==================== --
-local C = {
-    BG = Color3.fromRGB(10, 16, 14),
-    Sidebar = Color3.fromRGB(14, 24, 20),
-    Card = Color3.fromRGB(18, 32, 26),
-    CardInner = Color3.fromRGB(13, 22, 18),
-    Border = Color3.fromRGB(32, 60, 48),
-    Accent = Color3.fromRGB(43, 240, 153),
-    AccentHover = Color3.fromRGB(65, 255, 175),
-    Text = Color3.fromRGB(240, 255, 248),
-    Muted = Color3.fromRGB(120, 165, 145),
-    ToggleOff = Color3.fromRGB(28, 44, 38)
+--==================================================
+-- CONFIG
+--==================================================
+
+local LOGO_ID = "rbxassetid://134813417493601"
+
+local DESIGN_W = 700
+local DESIGN_H = 480
+
+local COLORS = {
+    Main = Color3.fromRGB(13, 21, 27),
+    Sidebar = Color3.fromRGB(15, 25, 31),
+    Panel = Color3.fromRGB(18, 29, 36),
+    Input = Color3.fromRGB(25, 38, 45),
+    InputHover = Color3.fromRGB(30, 46, 52),
+    Border = Color3.fromRGB(30, 45, 52),
+    Accent = Color3.fromRGB(76, 193, 184),
+    AccentDark = Color3.fromRGB(18, 45, 48),
+    Text = Color3.fromRGB(225, 235, 238),
+    Text2 = Color3.fromRGB(164, 176, 180),
+    Muted = Color3.fromRGB(92, 108, 114),
+    Muted2 = Color3.fromRGB(80, 94, 101),
+    White = Color3.fromRGB(235, 240, 238),
 }
 
-local function applyFont(instance, isBold)
-    local weight = isBold and Enum.FontWeight.Bold or Enum.FontWeight.Medium
-    local ok = pcall(function()
-        instance.FontFace = Font.fromName("LINE Seed Sans TH", weight)
-    end)
-    if not ok or not instance.FontFace or instance.FontFace.Family == "" then
-        instance.Font = isBold and Enum.Font.GothamBold or Enum.Font.GothamMedium
-    end
-end
+--==================================================
+-- SCREEN GUI
+--==================================================
 
--- ==================== SCREEN GUI ==================== --
 local ScreenGui = Instance.new("ScreenGui")
-ScreenGui.Name = "NyxStoreUniversalNinja"
+ScreenGui.Name = "OpenSeaUI"
 ScreenGui.ResetOnSpawn = false
-if syn and syn.protect_gui then
-    syn.protect_gui(ScreenGui)
-    ScreenGui.Parent = game:GetService("CoreGui")
-elseif gethui then
-    ScreenGui.Parent = gethui()
-else
-    ScreenGui.Parent = game:GetService("CoreGui")
-end
+ScreenGui.IgnoreGuiInset = true
+ScreenGui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
+ScreenGui.DisplayOrder = 999
+ScreenGui.Parent = PlayerGui
 
--- ==================== DRAGGABLE SYSTEM ==================== --
-local function makeDraggable(targetFrame, handle)
-    handle = handle or targetFrame
-    local dragging, dragInput, dragStart, startPos
-    handle.InputBegan:Connect(function(input)
-        if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
-            dragging = true
-            dragStart = input.Position
-            startPos = targetFrame.Position
-            input.Changed:Connect(function()
-                if input.UserInputState == Enum.UserInputState.End then
-                    dragging = false
-                end
-            end)
-        end
-    end)
-    handle.InputChanged:Connect(function(input)
-        if input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch then
-            dragInput = input
-        end
-    end)
-    UserInputService.InputChanged:Connect(function(input)
-        if input == dragInput and dragging then
-            local delta = input.Position - dragStart
-            targetFrame.Position = UDim2.new(
-                startPos.X.Scale,
-                startPos.X.Offset + delta.X,
-                startPos.Y.Scale,
-                startPos.Y.Offset + delta.Y
-            )
-        end
-    end)
-end
+--==================================================
+-- MAIN WINDOW
+--==================================================
 
--- ==================== FLOATING LOGO TOGGLE BUTTON ==================== --
-local FloatBtn = Instance.new("ImageButton")
-FloatBtn.Name = "NYX_FloatToggle"
-FloatBtn.Size = UDim2.new(0, 48, 0, 48)
-FloatBtn.Position = UDim2.new(0, 15, 0.4, 0)
-FloatBtn.BackgroundColor3 = C.Card
-FloatBtn.Image = "rbxassetid://134813417493601"
-FloatBtn.AutoButtonColor = false
-FloatBtn.Parent = ScreenGui
-
-local FloatCorner = Instance.new("UICorner")
-FloatCorner.CornerRadius = UDim.new(1, 0)
-FloatCorner.Parent = FloatBtn
-
-local FloatStroke = Instance.new("UIStroke")
-FloatStroke.Color = C.Accent
-FloatStroke.Thickness = 2
-FloatStroke.Parent = FloatBtn
-makeDraggable(FloatBtn)
-
--- ==================== MAIN WINDOW ==================== --
 local Main = Instance.new("Frame")
-Main.Name = "MainWindow"
-Main.BackgroundColor3 = C.BG
+Main.Name = "Main"
+Main.Size = UDim2.fromOffset(DESIGN_W, DESIGN_H)
+Main.AnchorPoint = Vector2.new(0.5, 0.5)
+Main.Position = UDim2.fromScale(0.5, 0.5)
+Main.BackgroundColor3 = COLORS.Main
 Main.BorderSizePixel = 0
 Main.ClipsDescendants = true
 Main.Parent = ScreenGui
 
 local MainCorner = Instance.new("UICorner")
-MainCorner.CornerRadius = UDim.new(0, 12)
+MainCorner.CornerRadius = UDim.new(0, 9)
 MainCorner.Parent = Main
 
 local MainStroke = Instance.new("UIStroke")
-MainStroke.Color = C.Border
-MainStroke.Thickness = 1.2
+MainStroke.Color = Color3.fromRGB(5, 10, 14)
+MainStroke.Thickness = 2
+MainStroke.Transparency = 0.1
 MainStroke.Parent = Main
 
-local function updateLayoutSize()
-    local vp = Camera.ViewportSize
-    local isMobile = vp.X < 850 or vp.Y < 550
-    if isMobile then
-        local w = math.clamp(vp.X * 0.94, 310, 600)
-        local h = math.clamp(vp.Y * 0.88, 260, 390)
-        Main.Size = UDim2.new(0, w, 0, h)
-        Main.Position = UDim2.new(0.5, -w / 2, 0.5, -h / 2)
-    else
-        Main.Size = UDim2.new(0, 720, 0, 440)
-        Main.Position = UDim2.new(0.5, -360, 0.5, -220)
-    end
-end
-updateLayoutSize()
-Camera:GetPropertyChangedSignal("ViewportSize"):Connect(updateLayoutSize)
+local MainScale = Instance.new("UIScale")
+MainScale.Parent = Main
 
-FloatBtn.Activated:Connect(function()
-    Main.Visible = not Main.Visible
+--==================================================
+-- RESPONSIVE SCALE
+-- Fits desktop, tablet and mobile without changing
+-- the internal design coordinates.
+--==================================================
+
+local function updateScale()
+    local camera = workspace.CurrentCamera
+    if not camera then
+        return
+    end
+
+    local viewport = camera.ViewportSize
+    local margin = UserInputService.TouchEnabled and 22 or 36
+
+    local scaleX = (viewport.X - margin) / DESIGN_W
+    local scaleY = (viewport.Y - margin) / DESIGN_H
+
+    local scale = math.min(scaleX, scaleY)
+    scale = math.clamp(scale, 0.48, 1.35)
+
+    MainScale.Scale = scale
+end
+
+task.defer(updateScale)
+
+if workspace.CurrentCamera then
+    workspace.CurrentCamera:GetPropertyChangedSignal("ViewportSize"):Connect(updateScale)
+end
+
+workspace:GetPropertyChangedSignal("CurrentCamera"):Connect(function()
+    task.defer(updateScale)
 end)
 
--- ==================== SIDEBAR ==================== --
-local SidebarWidth = 160
+--==================================================
+-- UTILITY
+--==================================================
+
+local function corner(parent, radius)
+    local c = Instance.new("UICorner")
+    c.CornerRadius = UDim.new(0, radius or 6)
+    c.Parent = parent
+    return c
+end
+
+local function stroke(parent, color, thickness, transparency)
+    local s = Instance.new("UIStroke")
+    s.Color = color or COLORS.Border
+    s.Thickness = thickness or 1
+    s.Transparency = transparency or 0
+    s.Parent = parent
+    return s
+end
+
+local function label(parent, text, position, size, textSize, color, font)
+    local l = Instance.new("TextLabel")
+    l.BackgroundTransparency = 1
+    l.Position = position
+    l.Size = size
+    l.Text = text
+    l.TextColor3 = color or COLORS.Text2
+    l.TextSize = textSize or 10
+    l.Font = font or Enum.Font.Gotham
+    l.TextXAlignment = Enum.TextXAlignment.Left
+    l.TextYAlignment = Enum.TextYAlignment.Center
+    l.Parent = parent
+    return l
+end
+
+local function image(parent, imageId, position, size, imageColor)
+    local i = Instance.new("ImageLabel")
+    i.BackgroundTransparency = 1
+    i.Position = position
+    i.Size = size
+    i.Image = imageId
+    i.ImageColor3 = imageColor or COLORS.Text2
+    i.ScaleType = Enum.ScaleType.Fit
+    i.Parent = parent
+    return i
+end
+
+local function button(parent, position, size, text, textSize)
+    local b = Instance.new("TextButton")
+    b.AutoButtonColor = false
+    b.BackgroundTransparency = 1
+    b.Position = position
+    b.Size = size
+    b.Text = text or ""
+    b.TextSize = textSize or 10
+    b.Font = Enum.Font.Gotham
+    b.TextColor3 = COLORS.Text2
+    b.BorderSizePixel = 0
+    b.Parent = parent
+    return b
+end
+
+local function tween(instance, properties, duration)
+    TweenService:Create(
+        instance,
+        TweenInfo.new(duration or 0.15, Enum.EasingStyle.Quad, Enum.EasingDirection.Out),
+        properties
+    ):Play()
+end
+
+--==================================================
+-- SIDEBAR
+--==================================================
+
 local Sidebar = Instance.new("Frame")
-Sidebar.Size = UDim2.new(0, SidebarWidth, 1, 0)
-Sidebar.BackgroundColor3 = C.Sidebar
+Sidebar.Name = "Sidebar"
+Sidebar.Size = UDim2.fromOffset(185, DESIGN_H)
+Sidebar.BackgroundColor3 = COLORS.Sidebar
 Sidebar.BorderSizePixel = 0
 Sidebar.Parent = Main
 
-local SidebarCorner = Instance.new("UICorner")
-SidebarCorner.CornerRadius = UDim.new(0, 12)
-SidebarCorner.Parent = Sidebar
+local SideCorner = corner(Sidebar, 9)
 
-local EdgeFix = Instance.new("Frame")
-EdgeFix.Size = UDim2.new(0, 10, 1, 0)
-EdgeFix.Position = UDim2.new(1, -10, 0, 0)
-EdgeFix.BackgroundColor3 = C.Sidebar
-EdgeFix.BorderSizePixel = 0
-EdgeFix.Parent = Sidebar
+local SideFix = Instance.new("Frame")
+SideFix.Size = UDim2.fromOffset(15, DESIGN_H)
+SideFix.Position = UDim2.new(1, -15, 0, 0)
+SideFix.BackgroundColor3 = COLORS.Sidebar
+SideFix.BorderSizePixel = 0
+SideFix.Parent = Sidebar
 
-local BrandIcon = Instance.new("ImageLabel")
-BrandIcon.Size = UDim2.new(0, 32, 0, 32)
-BrandIcon.Position = UDim2.new(0, 10, 0, 10)
-BrandIcon.BackgroundTransparency = 1
-BrandIcon.Image = "rbxassetid://134813417493601"
-BrandIcon.Parent = Sidebar
+--==================================================
+-- LOGO + TITLE
+--==================================================
 
-local BrandIconCorner = Instance.new("UICorner")
-BrandIconCorner.CornerRadius = UDim.new(1, 0)
-BrandIconCorner.Parent = BrandIcon
+local LogoHolder = Instance.new("ImageButton")
+LogoHolder.Name = "Logo"
+LogoHolder.AutoButtonColor = false
+LogoHolder.BackgroundTransparency = 1
+LogoHolder.Position = UDim2.fromOffset(14, 10)
+LogoHolder.Size = UDim2.fromOffset(38, 38)
+LogoHolder.Image = LOGO_ID
+LogoHolder.ScaleType = Enum.ScaleType.Fit
+LogoHolder.Parent = Sidebar
 
-local BrandName = Instance.new("TextLabel")
-BrandName.Position = UDim2.new(0, 48, 0, 10)
-BrandName.Size = UDim2.new(1, -52, 0, 16)
-BrandName.Text = "NYX STORE"
-BrandName.TextColor3 = C.Text
-BrandName.TextSize = 13
-BrandName.TextXAlignment = Enum.TextXAlignment.Left
-BrandName.BackgroundTransparency = 1
-applyFont(BrandName, true)
-BrandName.Parent = Sidebar
+local LogoFallback = label(
+    Sidebar,
+    "3",
+    UDim2.fromOffset(17, 9),
+    UDim2.fromOffset(35, 40),
+    31,
+    COLORS.Accent,
+    Enum.Font.GothamBold
+)
+LogoFallback.Visible = false
 
-local BrandSub = Instance.new("TextLabel")
-BrandSub.Position = UDim2.new(0, 48, 0, 26)
-BrandSub.Size = UDim2.new(1, -52, 0, 14)
-BrandSub.Text = "Ninja Legends"
-BrandSub.TextColor3 = C.Accent
-BrandSub.TextSize = 9.5
-BrandSub.TextXAlignment = Enum.TextXAlignment.Left
-BrandSub.BackgroundTransparency = 1
-applyFont(BrandSub, false)
-BrandSub.Parent = Sidebar
+local Title = label(
+    Sidebar,
+    "Open Sea For Animals",
+    UDim2.fromOffset(52, 10),
+    UDim2.fromOffset(126, 23),
+    13,
+    COLORS.Text,
+    Enum.Font.GothamBold
+)
 
-local NavList = Instance.new("ScrollingFrame")
-NavList.Position = UDim2.new(0, 6, 0, 52)
-NavList.Size = UDim2.new(1, -12, 1, -100)
-NavList.BackgroundTransparency = 1
-NavList.BorderSizePixel = 0
-NavList.ScrollBarThickness = 2
-NavList.ScrollBarImageColor3 = C.Accent
-NavList.AutomaticCanvasSize = Enum.AutomaticSize.Y
-NavList.Parent = Sidebar
+local Subtitle = label(
+    Sidebar,
+    "ปลดล็อคความสนุก!",
+    UDim2.fromOffset(52, 31),
+    UDim2.fromOffset(120, 17),
+    8,
+    COLORS.Muted
+)
 
-local NavLayout = Instance.new("UIListLayout")
-NavLayout.Padding = UDim.new(0, 4)
-NavLayout.Parent = NavList
+--==================================================
+-- ICON ASSETS
+-- These are Roblox image assets. ImageLabel is used
+-- instead of Unicode symbols so icons render reliably.
+--==================================================
 
-local UserCard = Instance.new("Frame")
-UserCard.Size = UDim2.new(1, -16, 0, 40)
-UserCard.Position = UDim2.new(0, 8, 1, -48)
-UserCard.BackgroundColor3 = C.Card
-UserCard.BorderSizePixel = 0
-UserCard.Parent = Sidebar
+local ICONS = {
+    Home = "rbxassetid://6031075938",
+    Settings = "rbxassetid://6031280882",
+    Search = "rbxassetid://6031154871",
+    Player = "rbxassetid://6034281935",
+    World = "rbxassetid://6026568213",
+    Quest = "rbxassetid://6031068421",
+    Misc = "rbxassetid://6031280883",
+    Upgrade = "rbxassetid://6034503369",
+    Close = "rbxassetid://6031094678",
+}
 
-local UserCardCorner = Instance.new("UICorner")
-UserCardCorner.CornerRadius = UDim.new(0, 8)
-UserCardCorner.Parent = UserCard
+--==================================================
+-- SIDEBAR LABELS
+--==================================================
 
-local Avatar = Instance.new("ImageLabel")
-Avatar.Size = UDim2.new(0, 26, 0, 26)
-Avatar.Position = UDim2.new(0, 6, 0.5, -13)
-Avatar.BackgroundColor3 = C.BG
-Avatar.Image = Players:GetUserThumbnailAsync(LocalPlayer.UserId, Enum.ThumbnailType.HeadShot, Enum.ThumbnailSize.Size100x100)
-Avatar.Parent = UserCard
+label(
+    Sidebar,
+    "MAIN",
+    UDim2.fromOffset(20, 72),
+    UDim2.fromOffset(150, 18),
+    9,
+    COLORS.Muted2,
+    Enum.Font.GothamBold
+)
 
-local AvCorner = Instance.new("UICorner")
-AvCorner.CornerRadius = UDim.new(1, 0)
-AvCorner.Parent = Avatar
+label(
+    Sidebar,
+    "OTHER",
+    UDim2.fromOffset(20, 313),
+    UDim2.fromOffset(150, 18),
+    9,
+    COLORS.Muted2,
+    Enum.Font.GothamBold
+)
 
-local NameText = Instance.new("TextLabel")
-NameText.Position = UDim2.new(0, 38, 0, 4)
-NameText.Size = UDim2.new(1, -42, 0, 14)
-NameText.Text = LocalPlayer.DisplayName
-NameText.TextColor3 = C.Text
-NameText.TextSize = 10
-NameText.TextTruncate = Enum.TextTruncate.AtEnd
-NameText.TextXAlignment = Enum.TextXAlignment.Left
-NameText.BackgroundTransparency = 1
-applyFont(NameText, true)
-NameText.Parent = UserCard
+--==================================================
+-- PAGE SYSTEM
+--==================================================
 
-local DeviceText = Instance.new("TextLabel")
-DeviceText.Position = UDim2.new(0, 38, 0, 20)
-DeviceText.Size = UDim2.new(1, -42, 0, 12)
-DeviceText.Text = UserInputService.TouchEnabled and "📱 Mobile Mode" or "💻 PC Mode"
-DeviceText.TextColor3 = C.Accent
-DeviceText.TextSize = 9
-DeviceText.TextXAlignment = Enum.TextXAlignment.Left
-DeviceText.BackgroundTransparency = 1
-applyFont(DeviceText, false)
-DeviceText.Parent = UserCard
+local Pages = Instance.new("Folder")
+Pages.Name = "Pages"
+Pages.Parent = Main
 
--- ==================== CONTENT WRAPPER ==================== --
-local ContentWrapper = Instance.new("Frame")
-ContentWrapper.Size = UDim2.new(1, -SidebarWidth, 1, 0)
-ContentWrapper.Position = UDim2.new(0, SidebarWidth, 0, 0)
-ContentWrapper.BackgroundTransparency = 1
-ContentWrapper.Parent = Main
+local SidebarButtons = {}
+local CurrentPage = nil
 
-local Topbar = Instance.new("Frame")
-Topbar.Size = UDim2.new(1, 0, 0, 48)
-Topbar.BackgroundTransparency = 1
-Topbar.Parent = ContentWrapper
-makeDraggable(Main, Topbar)
-
-local HeaderTitle = Instance.new("TextLabel")
-HeaderTitle.Position = UDim2.new(0, 14, 0, 8)
-HeaderTitle.Size = UDim2.new(0.7, 0, 0, 18)
-HeaderTitle.Text = "Auto Farm"
-HeaderTitle.TextColor3 = C.Text
-HeaderTitle.TextSize = 14
-HeaderTitle.TextXAlignment = Enum.TextXAlignment.Left
-HeaderTitle.BackgroundTransparency = 1
-applyFont(HeaderTitle, true)
-HeaderTitle.Parent = Topbar
-
-local HeaderSubtitle = Instance.new("TextLabel")
-HeaderSubtitle.Position = UDim2.new(0, 14, 0, 26)
-HeaderSubtitle.Size = UDim2.new(0.7, 0, 0, 14)
-HeaderSubtitle.Text = "ระบบฟาร์ม, ซื้อของทุกเกาะ, และขายเกาะสูงสุด"
-HeaderSubtitle.TextColor3 = C.Muted
-HeaderSubtitle.TextSize = 9.5
-HeaderSubtitle.TextXAlignment = Enum.TextXAlignment.Left
-HeaderSubtitle.BackgroundTransparency = 1
-applyFont(HeaderSubtitle, false)
-HeaderSubtitle.Parent = Topbar
-
-local CloseBtn = Instance.new("TextButton")
-CloseBtn.Size = UDim2.new(0, 26, 0, 26)
-CloseBtn.Position = UDim2.new(1, -34, 0, 11)
-CloseBtn.BackgroundColor3 = C.Card
-CloseBtn.Text = "✕"
-CloseBtn.TextColor3 = Color3.fromRGB(240, 85, 85)
-CloseBtn.TextSize = 11
-applyFont(CloseBtn, true)
-CloseBtn.Parent = Topbar
-
-local CloseCorner = Instance.new("UICorner")
-CloseCorner.CornerRadius = UDim.new(0, 6)
-CloseCorner.Parent = CloseBtn
-
-CloseBtn.Activated:Connect(function()
-    Main.Visible = false
-end)
-
-local PagesFolder = Instance.new("Folder")
-PagesFolder.Name = "Pages"
-PagesFolder.Parent = ContentWrapper
-
-local tabs = {}
-local function switchTab(tabName, titleText, descText)
-    for name, page in pairs(tabs) do
-        local isCurrent = (name == tabName)
-        page.Frame.Visible = isCurrent
-        TweenService:Create(page.Button, TweenInfo.new(0.18), {
-            BackgroundColor3 = isCurrent and C.Card or Color3.fromRGB(0, 0, 0),
-            BackgroundTransparency = isCurrent and 0 or 1
-        }):Play()
-        page.Button.TextColor3 = isCurrent and C.Accent or C.Muted
-        if isCurrent then
-            HeaderTitle.Text = titleText
-            HeaderSubtitle.Text = descText
-        end
-    end
+local function createPage(name)
+    local page = Instance.new("Frame")
+    page.Name = name
+    page.Size = UDim2.new(1, -185, 1, 0)
+    page.Position = UDim2.fromOffset(185, 0)
+    page.BackgroundTransparency = 1
+    page.Visible = false
+    page.Parent = Pages
+    return page
 end
 
-local function createTab(tabName, iconText, titleText, descText)
-    local TabButton = Instance.new("TextButton")
-    TabButton.Size = UDim2.new(1, 0, 0, 32)
-    TabButton.BackgroundColor3 = C.Card
-    TabButton.BackgroundTransparency = 1
-    TabButton.Text = "  " .. iconText .. "  " .. tabName
-    TabButton.TextColor3 = C.Muted
-    TabButton.TextSize = 10.5
-    TabButton.TextXAlignment = Enum.TextXAlignment.Left
-    applyFont(TabButton, true)
-    TabButton.Parent = NavList
+--==================================================
+-- SIDEBAR BUTTON
+--==================================================
 
-    local TabCorner = Instance.new("UICorner")
-    TabCorner.CornerRadius = UDim.new(0, 6)
-    TabCorner.Parent = TabButton
+local function createSideButton(name, iconId, y)
+    local holder = Instance.new("Frame")
+    holder.Name = name .. "Button"
+    holder.Size = UDim2.fromOffset(163, 39)
+    holder.Position = UDim2.fromOffset(10, y)
+    holder.BackgroundColor3 = COLORS.Sidebar
+    holder.BorderSizePixel = 0
+    holder.Parent = Sidebar
+    corner(holder, 6)
 
-    local PageFrame = Instance.new("Frame")
-    PageFrame.Name = tabName .. "_Page"
-    PageFrame.Size = UDim2.new(1, -20, 1, -54)
-    PageFrame.Position = UDim2.new(0, 10, 0, 48)
-    PageFrame.BackgroundTransparency = 1
-    PageFrame.Visible = false
-    PageFrame.Parent = PagesFolder
+    local hit = button(holder, UDim2.fromScale(0, 0), UDim2.fromScale(1, 1), "")
 
-    tabs[tabName] = {
-        Button = TabButton,
-        Frame = PageFrame
+    local icon = image(
+        holder,
+        iconId,
+        UDim2.fromOffset(9, 8),
+        UDim2.fromOffset(23, 23),
+        COLORS.Muted
+    )
+    icon.ZIndex = 3
+
+    local text = label(
+        holder,
+        name,
+        UDim2.fromOffset(40, 4),
+        UDim2.fromOffset(115, 31),
+        10,
+        COLORS.Text2,
+        Enum.Font.GothamMedium
+    )
+    text.ZIndex = 3
+
+    SidebarButtons[name] = {
+        Holder = holder,
+        Hit = hit,
+        Icon = icon,
+        Text = text,
     }
 
-    TabButton.Activated:Connect(function()
-        switchTab(tabName, titleText, descText)
+    hit.MouseEnter:Connect(function()
+        if CurrentPage ~= name then
+            tween(holder, {BackgroundColor3 = Color3.fromRGB(19, 32, 38)}, 0.12)
+        end
     end)
-    return PageFrame
+
+    hit.MouseLeave:Connect(function()
+        if CurrentPage ~= name then
+            tween(holder, {BackgroundColor3 = COLORS.Sidebar}, 0.12)
+        end
+    end)
+
+    hit.Activated:Connect(function()
+        if Pages:FindFirstChild(name) then
+            local target = Pages:FindFirstChild(name)
+            for _, page in ipairs(Pages:GetChildren()) do
+                if page:IsA("Frame") then
+                    page.Visible = (page == target)
+                end
+            end
+
+            for pageName, data in pairs(SidebarButtons) do
+                local selected = pageName == name
+                tween(
+                    data.Holder,
+                    {
+                        BackgroundColor3 = selected and COLORS.AccentDark or COLORS.Sidebar
+                    },
+                    0.12
+                )
+                data.Icon.ImageColor3 = selected and COLORS.Accent or COLORS.Muted
+                data.Text.TextColor3 = selected and COLORS.Text or COLORS.Text2
+            end
+
+            CurrentPage = name
+        end
+    end)
+
+    return holder
 end
 
--- ==================== COMPONENT BUILDERS ==================== --
-local function createColumnCard(parent, title, posXScale, widthScale)
-    local Card = Instance.new("Frame")
-    Card.Size = UDim2.new(widthScale or 0.485, 0, 1, -6)
-    Card.Position = UDim2.new(posXScale or 0, 0, 0, 0)
-    Card.BackgroundColor3 = C.Card
-    Card.BorderSizePixel = 0
-    Card.Parent = parent
+createSideButton("Home", ICONS.Home, 94)
+createSideButton("Auto Farm", ICONS.World, 136)
+createSideButton("Gym", ICONS.Player, 178)
+createSideButton("Upgrades & Progression", ICONS.Upgrade, 220)
+createSideButton("Quests & Boosts", ICONS.Quest, 262)
+createSideButton("Misc", ICONS.Misc, 332)
+createSideButton("Settings", ICONS.Settings, 374)
 
-    local CardCorner = Instance.new("UICorner")
-    CardCorner.CornerRadius = UDim.new(0, 9)
-    CardCorner.Parent = Card
+--==================================================
+-- USER CARD
+--==================================================
 
-    local CardStroke = Instance.new("UIStroke")
-    CardStroke.Color = C.Border
-    CardStroke.Thickness = 1
-    CardStroke.Parent = Card
+local UserLine = Instance.new("Frame")
+UserLine.Size = UDim2.fromOffset(155, 1)
+UserLine.Position = UDim2.fromOffset(15, 420)
+UserLine.BackgroundColor3 = Color3.fromRGB(38, 51, 57)
+UserLine.BorderSizePixel = 0
+UserLine.Parent = Sidebar
 
-    local CardHeader = Instance.new("Frame")
-    CardHeader.Size = UDim2.new(1, 0, 0, 28)
-    CardHeader.BackgroundTransparency = 1
-    CardHeader.Parent = Card
+local UserAvatar = Instance.new("ImageLabel")
+UserAvatar.Size = UDim2.fromOffset(28, 28)
+UserAvatar.Position = UDim2.fromOffset(16, 437)
+UserAvatar.BackgroundColor3 = Color3.fromRGB(230, 232, 229)
+UserAvatar.BorderSizePixel = 0
+UserAvatar.Image = LOGO_ID
+UserAvatar.ScaleType = Enum.ScaleType.Fit
+UserAvatar.Parent = Sidebar
+corner(UserAvatar, 100)
 
-    local Dot = Instance.new("Frame")
-    Dot.Size = UDim2.new(0, 5, 0, 5)
-    Dot.Position = UDim2.new(0, 10, 0.5, -2.5)
-    Dot.BackgroundColor3 = C.Accent
-    Dot.Parent = CardHeader
+label(
+    Sidebar,
+    Player.DisplayName or "Player",
+    UDim2.fromOffset(52, 434),
+    UDim2.fromOffset(112, 16),
+    9,
+    COLORS.Text,
+    Enum.Font.GothamBold
+)
 
-    local DotCorner = Instance.new("UICorner")
-    DotCorner.CornerRadius = UDim.new(1, 0)
-    DotCorner.Parent = Dot
+label(
+    Sidebar,
+    "UI Preview",
+    UDim2.fromOffset(52, 451),
+    UDim2.fromOffset(105, 14),
+    8,
+    COLORS.Muted
+)
 
-    local CardTitle = Instance.new("TextLabel")
-    CardTitle.Position = UDim2.new(0, 20, 0, 0)
-    CardTitle.Size = UDim2.new(1, -25, 1, 0)
-    CardTitle.Text = title
-    CardTitle.TextColor3 = C.Text
-    CardTitle.TextSize = 11
-    CardTitle.TextXAlignment = Enum.TextXAlignment.Left
-    CardTitle.BackgroundTransparency = 1
-    applyFont(CardTitle, true)
-    CardTitle.Parent = CardHeader
+--==================================================
+-- PAGE HEADER
+--==================================================
 
-    local Scroll = Instance.new("ScrollingFrame")
-    Scroll.Position = UDim2.new(0, 5, 0, 28)
-    Scroll.Size = UDim2.new(1, -10, 1, -34)
-    Scroll.BackgroundTransparency = 1
-    Scroll.BorderSizePixel = 0
-    Scroll.ScrollBarThickness = 3
-    Scroll.ScrollBarImageColor3 = C.Accent
-    Scroll.AutomaticCanvasSize = Enum.AutomaticSize.Y
-    Scroll.Parent = Card
+local function createPageHeader(page, titleText, subtitleText, iconId)
+    local header = Instance.new("Frame")
+    header.Size = UDim2.new(1, -30, 0, 65)
+    header.Position = UDim2.fromOffset(15, 5)
+    header.BackgroundTransparency = 1
+    header.Parent = page
 
-    local List = Instance.new("UIListLayout")
-    List.Padding = UDim.new(0, 5)
-    List.HorizontalAlignment = Enum.HorizontalAlignment.Center
-    List.Parent = Scroll
+    image(
+        header,
+        iconId,
+        UDim2.fromOffset(0, 14),
+        UDim2.fromOffset(22, 22),
+        COLORS.Accent
+    )
 
-    return Scroll
+    label(
+        header,
+        titleText,
+        UDim2.fromOffset(29, 7),
+        UDim2.fromOffset(330, 24),
+        17,
+        COLORS.Text,
+        Enum.Font.GothamBold
+    )
+
+    label(
+        header,
+        subtitleText,
+        UDim2.fromOffset(29, 30),
+        UDim2.fromOffset(450, 20),
+        8,
+        COLORS.Muted
+    )
+
+    return header
 end
 
-local function addToggle(parent, title, default, callback)
-    local Frame = Instance.new("Frame")
-    Frame.Size = UDim2.new(1, -2, 0, 36)
-    Frame.BackgroundColor3 = C.CardInner
-    Frame.Parent = parent
+--==================================================
+-- TOP BUTTONS
+--==================================================
 
-    local Corner = Instance.new("UICorner")
-    Corner.CornerRadius = UDim.new(0, 7)
-    Corner.Parent = Frame
+local SearchOverlay = Instance.new("Frame")
+SearchOverlay.Name = "SearchOverlay"
+SearchOverlay.Size = UDim2.fromOffset(190, 32)
+SearchOverlay.Position = UDim2.new(1, -292, 0, 21)
+SearchOverlay.BackgroundColor3 = COLORS.Input
+SearchOverlay.BorderSizePixel = 0
+SearchOverlay.Visible = false
+SearchOverlay.ZIndex = 30
+SearchOverlay.Parent = Main
+corner(SearchOverlay, 6)
+stroke(SearchOverlay, COLORS.Border, 1, 0.2)
 
-    local Label = Instance.new("TextLabel")
-    Label.Position = UDim2.new(0, 8, 0, 0)
-    Label.Size = UDim2.new(0.68, 0, 1, 0)
-    Label.Text = title
-    Label.TextColor3 = C.Text
-    Label.TextSize = 10
-    Label.TextXAlignment = Enum.TextXAlignment.Left
-    Label.BackgroundTransparency = 1
-    applyFont(Label, false)
-    Label.Parent = Frame
+image(
+    SearchOverlay,
+    ICONS.Search,
+    UDim2.fromOffset(8, 7),
+    UDim2.fromOffset(18, 18),
+    COLORS.Muted
+).ZIndex = 31
 
-    local Switch = Instance.new("TextButton")
-    Switch.Position = UDim2.new(1, -38, 0.5, -9)
-    Switch.Size = UDim2.new(0, 32, 0, 18)
-    Switch.BackgroundColor3 = default and C.Accent or C.ToggleOff
-    Switch.Text = ""
-    Switch.AutoButtonColor = false
-    Switch.Parent = Frame
+local SearchBox = Instance.new("TextBox")
+SearchBox.BackgroundTransparency = 1
+SearchBox.Position = UDim2.fromOffset(32, 0)
+SearchBox.Size = UDim2.new(1, -38, 1, 0)
+SearchBox.PlaceholderText = "Search..."
+SearchBox.PlaceholderColor3 = COLORS.Muted
+SearchBox.Text = ""
+SearchBox.TextColor3 = COLORS.Text
+SearchBox.TextSize = 9
+SearchBox.Font = Enum.Font.Gotham
+SearchBox.TextXAlignment = Enum.TextXAlignment.Left
+SearchBox.ClearTextOnFocus = false
+SearchBox.ZIndex = 31
+SearchBox.Parent = SearchOverlay
 
-    local SwitchCorner = Instance.new("UICorner")
-    SwitchCorner.CornerRadius = UDim.new(1, 0)
-    SwitchCorner.Parent = Switch
+local TopSearch = button(
+    Main,
+    UDim2.new(1, -108, 0, 16),
+    UDim2.fromOffset(30, 30),
+    "",
+    10
+)
+TopSearch.BackgroundTransparency = false
+TopSearch.BackgroundColor3 = Color3.fromRGB(22, 34, 41)
+TopSearch.ZIndex = 20
+corner(TopSearch, 5)
 
-    local Knob = Instance.new("Frame")
-    Knob.Size = UDim2.new(0, 14, 0, 14)
-    Knob.Position = default and UDim2.new(1, -15, 0.5, -7) or UDim2.new(0, 2, 0.5, -7)
-    Knob.BackgroundColor3 = default and C.BG or Color3.fromRGB(150, 175, 165)
-    Knob.BorderSizePixel = 0
-    Knob.Parent = Switch
+local TopSearchIcon = image(
+    TopSearch,
+    ICONS.Search,
+    UDim2.fromOffset(7, 7),
+    UDim2.fromOffset(16, 16),
+    COLORS.Text2
+)
+TopSearchIcon.ZIndex = 21
 
-    local KnobCorner = Instance.new("UICorner")
-    KnobCorner.CornerRadius = UDim.new(1, 0)
-    KnobCorner.Parent = Knob
+local TopSettings = button(
+    Main,
+    UDim2.new(1, -73, 0, 16),
+    UDim2.fromOffset(30, 30),
+    "",
+    10
+)
+TopSettings.BackgroundTransparency = false
+TopSettings.BackgroundColor3 = Color3.fromRGB(22, 34, 41)
+TopSettings.ZIndex = 20
+corner(TopSettings, 5)
 
-    local active = default
-    local function toggle()
-        active = not active
-        callback(active)
-        TweenService:Create(Switch, TweenInfo.new(0.16), {
-            BackgroundColor3 = active and C.Accent or C.ToggleOff
-        }):Play()
-        TweenService:Create(Knob, TweenInfo.new(0.16), {
-            Position = active and UDim2.new(1, -15, 0.5, -7) or UDim2.new(0, 2, 0.5, -7),
-            BackgroundColor3 = active and C.BG or Color3.fromRGB(150, 175, 165)
-        }):Play()
+local TopSettingsIcon = image(
+    TopSettings,
+    ICONS.Settings,
+    UDim2.fromOffset(7, 7),
+    UDim2.fromOffset(16, 16),
+    COLORS.Text2
+)
+TopSettingsIcon.ZIndex = 21
+
+local TopClose = button(
+    Main,
+    UDim2.new(1, -38, 0, 16),
+    UDim2.fromOffset(30, 30),
+    "",
+    15
+)
+TopClose.BackgroundTransparency = false
+TopClose.BackgroundColor3 = Color3.fromRGB(22, 34, 41)
+TopClose.Text = "−"
+TopClose.TextColor3 = COLORS.Text2
+TopClose.ZIndex = 20
+corner(TopClose, 5)
+
+TopSearch.MouseEnter:Connect(function()
+    tween(TopSearch, {BackgroundColor3 = COLORS.InputHover}, 0.12)
+end)
+TopSearch.MouseLeave:Connect(function()
+    tween(TopSearch, {BackgroundColor3 = Color3.fromRGB(22, 34, 41)}, 0.12)
+end)
+
+TopSettings.MouseEnter:Connect(function()
+    tween(TopSettings, {BackgroundColor3 = COLORS.InputHover}, 0.12)
+end)
+TopSettings.MouseLeave:Connect(function()
+    tween(TopSettings, {BackgroundColor3 = Color3.fromRGB(22, 34, 41)}, 0.12)
+end)
+
+TopSearch.Activated:Connect(function()
+    SearchOverlay.Visible = not SearchOverlay.Visible
+    if SearchOverlay.Visible then
+        SearchBox:CaptureFocus()
     end
+end)
 
-    Switch.Activated:Connect(toggle)
-    local ClickDetector = Instance.new("TextButton")
-    ClickDetector.Size = UDim2.new(1, -40, 1, 0)
-    ClickDetector.BackgroundTransparency = 1
-    ClickDetector.Text = ""
-    ClickDetector.Parent = Frame
-    ClickDetector.Activated:Connect(toggle)
-end
-
-local function addSlider(parent, title, min, max, default, callback)
-    local Frame = Instance.new("Frame")
-    Frame.Size = UDim2.new(1, -2, 0, 46)
-    Frame.BackgroundColor3 = C.CardInner
-    Frame.Parent = parent
-
-    local Corner = Instance.new("UICorner")
-    Corner.CornerRadius = UDim.new(0, 7)
-    Corner.Parent = Frame
-
-    local Label = Instance.new("TextLabel")
-    Label.Position = UDim2.new(0, 8, 0, 4)
-    Label.Size = UDim2.new(0.65, 0, 0, 14)
-    Label.Text = title
-    Label.TextColor3 = C.Text
-    Label.TextSize = 10
-    Label.TextXAlignment = Enum.TextXAlignment.Left
-    Label.BackgroundTransparency = 1
-    applyFont(Label, false)
-    Label.Parent = Frame
-
-    local ValLabel = Instance.new("TextLabel")
-    ValLabel.Position = UDim2.new(1, -50, 0, 4)
-    ValLabel.Size = UDim2.new(0, 42, 0, 14)
-    ValLabel.Text = tostring(default)
-    ValLabel.TextColor3 = C.Accent
-    ValLabel.TextSize = 10.5
-    ValLabel.TextXAlignment = Enum.TextXAlignment.Right
-    ValLabel.BackgroundTransparency = 1
-    applyFont(ValLabel, true)
-    ValLabel.Parent = Frame
-
-    local Bar = Instance.new("Frame")
-    Bar.Size = UDim2.new(1, -16, 0, 6)
-    Bar.Position = UDim2.new(0, 8, 0, 28)
-    Bar.BackgroundColor3 = Color3.fromRGB(24, 38, 32)
-    Bar.BorderSizePixel = 0
-    Bar.Parent = Frame
-
-    local BarCorner = Instance.new("UICorner")
-    BarCorner.CornerRadius = UDim.new(1, 0)
-    BarCorner.Parent = Bar
-
-    local Fill = Instance.new("Frame")
-    local initRatio = math.clamp((default - min) / (max - min), 0, 1)
-    Fill.Size = UDim2.new(initRatio, 0, 1, 0)
-    Fill.BackgroundColor3 = C.Accent
-    Fill.BorderSizePixel = 0
-    Fill.Parent = Bar
-
-    local FillCorner = Instance.new("UICorner")
-    FillCorner.CornerRadius = UDim.new(1, 0)
-    FillCorner.Parent = Fill
-
-    local isDragging = false
-    local function updateValue(inputX)
-        local barX = Bar.AbsolutePosition.X
-        local barW = Bar.AbsoluteSize.X
-        local ratio = math.clamp((inputX - barX) / barW, 0, 1)
-        Fill.Size = UDim2.new(ratio, 0, 1, 0)
-        local value = math.floor(min + (max - min) * ratio)
-        ValLabel.Text = tostring(value)
-        callback(value)
+TopSettings.Activated:Connect(function()
+    local target = Pages:FindFirstChild("Settings")
+    if target then
+        for _, page in ipairs(Pages:GetChildren()) do
+            if page:IsA("Frame") then
+                page.Visible = (page == target)
+            end
+        end
+        for name, data in pairs(SidebarButtons) do
+            local selected = name == "Settings"
+            tween(data.Holder, {
+                BackgroundColor3 = selected and COLORS.AccentDark or COLORS.Sidebar
+            }, 0.12)
+            data.Icon.ImageColor3 = selected and COLORS.Accent or COLORS.Muted
+            data.Text.TextColor3 = selected and COLORS.Text or COLORS.Text2
+        end
+        CurrentPage = "Settings"
     end
+end)
 
-    Bar.InputBegan:Connect(function(input)
-        if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
-            isDragging = true
-            updateValue(input.Position.X)
-        end
-    end)
-    UserInputService.InputEnded:Connect(function(input)
-        if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
-            isDragging = false
-        end
-    end)
-    UserInputService.InputChanged:Connect(function(input)
-        if isDragging and (input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch) then
-            updateValue(input.Position.X)
-        end
-    end)
+--==================================================
+-- OPEN / CLOSE
+--==================================================
+
+local OpenButton = Instance.new("ImageButton")
+OpenButton.Name = "OpenButton"
+OpenButton.Size = UDim2.fromOffset(48, 48)
+OpenButton.AnchorPoint = Vector2.new(1, 1)
+OpenButton.Position = UDim2.new(1, -18, 1, -18)
+OpenButton.BackgroundColor3 = COLORS.Panel
+OpenButton.BorderSizePixel = 0
+OpenButton.AutoButtonColor = false
+OpenButton.Image = LOGO_ID
+OpenButton.ScaleType = Enum.ScaleType.Fit
+OpenButton.Visible = false
+OpenButton.Parent = ScreenGui
+corner(OpenButton, 12)
+stroke(OpenButton, COLORS.Border, 1, 0.1)
+
+TopClose.Activated:Connect(function()
+    Main.Visible = false
+    OpenButton.Visible = true
+end)
+
+OpenButton.Activated:Connect(function()
+    Main.Visible = true
+    OpenButton.Visible = false
+    updateScale()
+end)
+
+--==================================================
+-- PANEL HELPERS
+--==================================================
+
+local function createPanel(parent, position, size, titleText, iconId)
+    local panel = Instance.new("Frame")
+    panel.Size = size
+    panel.Position = position
+    panel.BackgroundColor3 = COLORS.Panel
+    panel.BorderSizePixel = 0
+    panel.Parent = parent
+    corner(panel, 7)
+    stroke(panel, COLORS.Border, 1, 0.25)
+
+    image(
+        panel,
+        iconId,
+        UDim2.fromOffset(10, 8),
+        UDim2.fromOffset(18, 18),
+        COLORS.Accent
+    )
+
+    label(
+        panel,
+        titleText,
+        UDim2.fromOffset(34, 5),
+        UDim2.new(1, -65, 0, 25),
+        11,
+        COLORS.Text,
+        Enum.Font.GothamBold
+    )
+
+    local arrow = label(
+        panel,
+        "⌄",
+        UDim2.new(1, -28, 0, 7),
+        UDim2.fromOffset(18, 18),
+        12,
+        COLORS.Muted,
+        Enum.Font.GothamBold
+    )
+    arrow.TextXAlignment = Enum.TextXAlignment.Center
+
+    return panel
 end
 
-local function addButton(parent, title, callback)
-    local Button = Instance.new("TextButton")
-    Button.Size = UDim2.new(1, -2, 0, 32)
-    Button.BackgroundColor3 = C.CardInner
-    Button.Text = title
-    Button.TextColor3 = C.Accent
-    Button.TextSize = 10.5
-    applyFont(Button, true)
-    Button.Parent = parent
-
-    local Corner = Instance.new("UICorner")
-    Corner.CornerRadius = UDim.new(0, 7)
-    Corner.Parent = Button
-
-    local Stroke = Instance.new("UIStroke")
-    Stroke.Color = C.Border
-    Stroke.Thickness = 1
-    Stroke.Parent = Button
-
-    Button.Activated:Connect(callback)
+local function createText(parent, textValue, x, y, width)
+    return label(
+        parent,
+        textValue,
+        UDim2.fromOffset(x, y),
+        UDim2.fromOffset(width or 190, 18),
+        9,
+        COLORS.Text2
+    )
 end
 
-local function addDropdown(parent, title, listItems, defaultItem, callback)
-    local Container = Instance.new("Frame")
-    Container.Size = UDim2.new(1, -2, 0, 36)
-    Container.BackgroundColor3 = C.CardInner
-    Container.ClipsDescendants = true
-    Container.Parent = parent
+--==================================================
+-- DROPDOWN
+--==================================================
 
-    local ContainerCorner = Instance.new("UICorner")
-    ContainerCorner.CornerRadius = UDim.new(0, 7)
-    ContainerCorner.Parent = Container
+local function createDropdown(parent, y, currentText, options)
+    local drop = Instance.new("Frame")
+    drop.Size = UDim2.fromOffset(198, 29)
+    drop.Position = UDim2.fromOffset(20, y)
+    drop.BackgroundColor3 = COLORS.Input
+    drop.BorderSizePixel = 0
+    drop.ClipsDescendants = false
+    drop.ZIndex = 5
+    drop.Parent = parent
+    corner(drop, 5)
 
-    local SelectedBtn = Instance.new("TextButton")
-    SelectedBtn.Size = UDim2.new(1, 0, 0, 36)
-    SelectedBtn.BackgroundTransparency = 1
-    SelectedBtn.Text = "  " .. title .. ": " .. defaultItem
-    SelectedBtn.TextColor3 = C.Text
-    SelectedBtn.TextSize = 10
-    SelectedBtn.TextXAlignment = Enum.TextXAlignment.Left
-    applyFont(SelectedBtn, true)
-    SelectedBtn.Parent = Container
+    local hit = button(drop, UDim2.fromScale(0, 0), UDim2.fromScale(1, 1), "")
+    hit.ZIndex = 7
 
-    local Arrow = Instance.new("TextLabel")
-    Arrow.Size = UDim2.new(0, 20, 0, 36)
-    Arrow.Position = UDim2.new(1, -24, 0, 0)
-    Arrow.Text = "▼"
-    Arrow.TextColor3 = C.Accent
-    Arrow.TextSize = 9
-    Arrow.BackgroundTransparency = 1
-    Arrow.Parent = Container
+    local value = label(
+        drop,
+        currentText,
+        UDim2.fromOffset(10, 0),
+        UDim2.new(1, -38, 1, 0),
+        9,
+        COLORS.Text2
+    )
+    value.ZIndex = 8
 
-    local DropScroll = Instance.new("ScrollingFrame")
-    DropScroll.Position = UDim2.new(0, 4, 0, 36)
-    DropScroll.Size = UDim2.new(1, -8, 0, 105)
-    DropScroll.BackgroundColor3 = C.BG
-    DropScroll.BorderSizePixel = 0
-    DropScroll.ScrollBarThickness = 3
-    DropScroll.ScrollBarImageColor3 = C.Accent
-    DropScroll.AutomaticCanvasSize = Enum.AutomaticSize.Y
-    DropScroll.Parent = Container
+    local arrow = label(
+        drop,
+        "⌄",
+        UDim2.new(1, -27, 0, 4),
+        UDim2.fromOffset(18, 20),
+        11,
+        COLORS.Muted,
+        Enum.Font.GothamBold
+    )
+    arrow.TextXAlignment = Enum.TextXAlignment.Center
+    arrow.ZIndex = 8
 
-    local DropLayout = Instance.new("UIListLayout")
-    DropLayout.Padding = UDim.new(0, 2)
-    DropLayout.Parent = DropScroll
+    local menu = Instance.new("Frame")
+    menu.Size = UDim2.fromOffset(198, math.min(#options, 5) * 26 + 4)
+    menu.Position = UDim2.fromOffset(0, 31)
+    menu.BackgroundColor3 = COLORS.Input
+    menu.BorderSizePixel = 0
+    menu.Visible = false
+    menu.ZIndex = 50
+    menu.Parent = drop
+    corner(menu, 5)
+    stroke(menu, COLORS.Border, 1, 0.1)
 
-    local isOpen = false
-    SelectedBtn.Activated:Connect(function()
-        isOpen = not isOpen
-        Arrow.Text = isOpen and "▲" or "▼"
-        TweenService:Create(Container, TweenInfo.new(0.18), {
-            Size = isOpen and UDim2.new(1, -2, 0, 145) or UDim2.new(1, -2, 0, 36)
-        }):Play()
-    end)
+    local layout = Instance.new("UIListLayout")
+    layout.Padding = UDim.new(0, 1)
+    layout.SortOrder = Enum.SortOrder.LayoutOrder
+    layout.Parent = menu
 
-    for _, item in ipairs(listItems) do
-        local ItemBtn = Instance.new("TextButton")
-        ItemBtn.Size = UDim2.new(1, 0, 0, 24)
-        ItemBtn.BackgroundColor3 = C.Card
-        ItemBtn.Text = "  " .. item
-        ItemBtn.TextColor3 = C.Muted
-        ItemBtn.TextSize = 9.5
-        ItemBtn.TextXAlignment = Enum.TextXAlignment.Left
-        applyFont(ItemBtn, false)
-        ItemBtn.Parent = DropScroll
+    for _, option in ipairs(options) do
+        local opt = button(menu, UDim2.fromOffset(3, 0), UDim2.new(1, -6, 0, 25), option, 9)
+        opt.BackgroundTransparency = false
+        opt.BackgroundColor3 = COLORS.Input
+        opt.TextColor3 = COLORS.Text2
+        opt.TextXAlignment = Enum.TextXAlignment.Left
+        opt.ZIndex = 51
+        corner(opt, 4)
 
-        local ItemCorner = Instance.new("UICorner")
-        ItemCorner.CornerRadius = UDim.new(0, 5)
-        ItemCorner.Parent = ItemBtn
+        opt.MouseEnter:Connect(function()
+            tween(opt, {BackgroundColor3 = COLORS.AccentDark}, 0.1)
+        end)
+        opt.MouseLeave:Connect(function()
+            tween(opt, {BackgroundColor3 = COLORS.Input}, 0.1)
+        end)
 
-        ItemBtn.Activated:Connect(function()
-            SelectedBtn.Text = "  " .. title .. ": " .. item
-            callback(item)
-            isOpen = false
-            Arrow.Text = "▼"
-            TweenService:Create(Container, TweenInfo.new(0.18), {
-                Size = UDim2.new(1, -2, 0, 36)
-            }):Play()
+        opt.Activated:Connect(function()
+            value.Text = option
+            menu.Visible = false
+            arrow.Text = "⌄"
         end)
     end
+
+    hit.MouseEnter:Connect(function()
+        tween(drop, {BackgroundColor3 = COLORS.InputHover}, 0.1)
+    end)
+    hit.MouseLeave:Connect(function()
+        tween(drop, {BackgroundColor3 = COLORS.Input}, 0.1)
+    end)
+
+    hit.Activated:Connect(function()
+        menu.Visible = not menu.Visible
+        arrow.Text = menu.Visible and "⌃" or "⌄"
+    end)
+
+    return drop
 end
 
--- ==================== DATA & PROGRESSION ==================== --
-local Flags = {
-    AutoSwing = false,
-    AutoSellMax = false,
-    AutoBuyAllSwords = false,
-    AutoBuyAllBelts = false,
-    AutoBuyAllSkills = false,
-    AutoBuyNextClass = false,
-    AutoFarmChi = false,
-    AutoOpenCrystal = false,
-    SelectedCrystal = "Blue Crystal",
-    -- Boss Farming Flags
-    AutoBossFarm = false,
-    SelectedBoss = "All Bosses",
-    BossAttackSpeed = 5,
-    -- Pets & Glitch Level / Stats Flags
-    FastPetLevelBoost = false,
-    AutoMaxPetUpgrades = false,
-    -- Movement Flags
-    WalkSpeedEnabled = false,
-    WalkSpeedValue = 16,
-    FlyEnabled = false,
-    FlySpeed = 50,
-    InfJump = false
-}
+--==================================================
+-- TOGGLE (UI ONLY)
+--==================================================
 
-local BossOptions = {
-    "All Bosses",
-    "Robot Boss",
-    "Eternal Boss",
-    "Ancient Magma Boss"
-}
+local function createToggle(parent, textValue, y)
+    local holder = Instance.new("Frame")
+    holder.Size = UDim2.fromOffset(198, 26)
+    holder.Position = UDim2.fromOffset(20, y)
+    holder.BackgroundTransparency = 1
+    holder.Parent = parent
 
-local OrderedRanks = {
-    { name = "Rookie", cost = 0 },
-    { name = "Grasshopper", cost = 2e6 },
-    { name = "Apprentice", cost = 1.5e8 },
-    { name = "Samurai", cost = 1.1e10 },
-    { name = "Assassin", cost = 8.5e11 },
-    { name = "Shadow", cost = 6.3e13 },
-    { name = "Ninja", cost = 4.75e14 },
-    { name = "Master Ninja", cost = 3.5e15 },
-    { name = "Sensei", cost = 2.6e16 },
-    { name = "Master Sensei", cost = 2e17 },
-    { name = "Ninja Legend", cost = 1.5e18 },
-    { name = "Master Of Shadows", cost = 2.5e20 },
-    { name = "Immortal Assassin", cost = 2.5e21 },
-    { name = "Eternity Hunter", cost = 9.25e23 },
-    { name = "Shadow Legend", cost = 2.5e26 },
-    { name = "Dragon Warrior", cost = 1.5e28 },
-    { name = "Dragon Master", cost = 3.5e29 },
-    { name = "Chaos Sensei", cost = 5e30 },
-    { name = "Chaos Legend", cost = 6e31 },
-    { name = "Master Of Elements", cost = 8e32 },
-    { name = "Elemental Legend", cost = 6e33 },
-    { name = "Ancient Battle Master", cost = 8.5e35 },
-    { name = "Ancient Battle Legend", cost = 9e36 },
-    { name = "Legendary Shadow Duelist", cost = 3.5e38 },
-    { name = "Master Legend Assassin", cost = 7e39 },
-    { name = "Mythic Shadowmaster", cost = 7e41 },
-    { name = "Legendary Shadowmaster", cost = 2.6e43 },
-    { name = "Awakened Scythemaster", cost = 2e45 },
-    { name = "Awakened Scythe Legend", cost = 1e47 },
-    { name = "Master Legend Zephyr", cost = 7e49 },
-    { name = "Golden Sun Shuriken Master", cost = 7e50 },
-    { name = "Golden Sun Shuriken Legend", cost = 1e52 },
-    { name = "Dark Sun Samurai Legend", cost = 9.5e54 },
-    { name = "Dragon Evolution Form I", cost = 9e56 },
-    { name = "Dragon Evolution Form II", cost = 1.62e58 },
-    { name = "Dragon Evolution Form III", cost = 1.872e59 },
-    { name = "Dragon Evolution Form IV", cost = 4e60 },
-    { name = "Dragon Evolution Form V", cost = 8e61 },
-    { name = "Cybernetic Electro Master", cost = 4e62 },
-    { name = "Cybernetic Electro Legend", cost = 4.8e64 },
-    { name = "Shadow Chaos Assassin", cost = 6.4e66 },
-    { name = "Shadow Chaos Legend", cost = 2.4e68 },
-    { name = "Infinity Sensei", cost = 4.8e69 },
-    { name = "Infinity Legend", cost = 1.6e72 },
-    { name = "Aether Genesis Master Ninja", cost = 5.6e75 }
-}
+    local hit = button(holder, UDim2.fromScale(0, 0), UDim2.fromScale(1, 1), "")
+    hit.ZIndex = 5
 
-local SuffixMap = {
-    k = 1e3, m = 1e6, b = 1e9, t = 1e12,
-    qa = 1e15, qi = 1e18, si = 1e21, sp = 1e24, oc = 1e27, n = 1e30,
-    dc = 1e33, un = 1e36, duo = 1e39, tre = 1e42, qua = 1e45, qui = 1e48,
-    se = 1e51, sp2 = 1e54, oc2 = 1e57, nv = 1e60, vig = 1e63, ce = 1e66,
-    trv = 1e69, qtu = 1e72, spz = 1e75, cjx = 1e78, vnu = 1e81
-}
+    local track = Instance.new("Frame")
+    track.Size = UDim2.fromOffset(28, 15)
+    track.Position = UDim2.fromOffset(0, 5)
+    track.BackgroundColor3 = Color3.fromRGB(39, 53, 59)
+    track.BorderSizePixel = 0
+    track.Parent = holder
+    corner(track, 20)
 
-local function parseNumber(val)
-    if type(val) == "number" then return val end
-    if type(val) ~= "string" then return 0 end
-    val = val:gsub(",", ""):gsub("%s+", "")
-    local num, suffix = val:match("^([%d%.]+)%s*([%a]*)$")
-    if num then
-        local n = tonumber(num) or 0
-        if suffix and suffix ~= "" then
-            local mult = SuffixMap[suffix:lower()]
-            if mult then return n * mult end
+    local knob = Instance.new("Frame")
+    knob.Size = UDim2.fromOffset(11, 11)
+    knob.Position = UDim2.fromOffset(2, 2)
+    knob.BackgroundColor3 = COLORS.Muted
+    knob.BorderSizePixel = 0
+    knob.Parent = track
+    corner(knob, 20)
+
+    local textLabel = label(
+        holder,
+        textValue,
+        UDim2.fromOffset(38, 0),
+        UDim2.fromOffset(155, 25),
+        9,
+        COLORS.Text2
+    )
+
+    local state = false
+
+    hit.Activated:Connect(function()
+        -- UI interaction only; no actual game function.
+        state = not state
+
+        tween(
+            track,
+            {BackgroundColor3 = state and COLORS.AccentDark or Color3.fromRGB(39, 53, 59)},
+            0.12
+        )
+        tween(
+            knob,
+            {
+                Position = state and UDim2.fromOffset(15, 2) or UDim2.fromOffset(2, 2),
+                BackgroundColor3 = state and COLORS.Accent or COLORS.Muted
+            },
+            0.12
+        )
+    end)
+
+    return holder
+end
+
+--==================================================
+-- SLIDER (UI ONLY)
+--==================================================
+
+local function createSlider(parent, y, valueText, percent)
+    local holder = Instance.new("Frame")
+    holder.Size = UDim2.fromOffset(218, 31)
+    holder.Position = UDim2.fromOffset(20, y)
+    holder.BackgroundTransparency = 1
+    holder.Parent = parent
+
+    local track = Instance.new("Frame")
+    track.Size = UDim2.fromOffset(198, 5)
+    track.Position = UDim2.fromOffset(0, 17)
+    track.BackgroundColor3 = Color3.fromRGB(36, 48, 54)
+    track.BorderSizePixel = 0
+    track.Parent = holder
+    corner(track, 10)
+
+    local fill = Instance.new("Frame")
+    fill.Size = UDim2.new(percent, 0, 1, 0)
+    fill.BackgroundColor3 = COLORS.Accent
+    fill.BorderSizePixel = 0
+    fill.Parent = track
+    corner(fill, 10)
+
+    local knob = Instance.new("Frame")
+    knob.Size = UDim2.fromOffset(12, 12)
+    knob.Position = UDim2.new(percent, -6, 0.5, -6)
+    knob.BackgroundColor3 = COLORS.White
+    knob.BorderSizePixel = 0
+    knob.Parent = track
+    corner(knob, 20)
+
+    local value = label(
+        holder,
+        valueText,
+        UDim2.fromOffset(198, 0),
+        UDim2.fromOffset(25, 18),
+        9,
+        COLORS.Text
+    )
+    value.TextXAlignment = Enum.TextXAlignment.Right
+
+    local drag = false
+
+    local function setPercent(x)
+        local relative = math.clamp(
+            (x - track.AbsolutePosition.X) / track.AbsoluteSize.X,
+            0,
+            1
+        )
+
+        fill.Size = UDim2.new(relative, 0, 1, 0)
+        knob.Position = UDim2.new(relative, -6, 0.5, -6)
+
+        -- UI-only value preview.
+        value.Text = tostring(math.floor(relative * 10 + 0.5))
+    end
+
+    track.InputBegan:Connect(function(input)
+        if input.UserInputType == Enum.UserInputType.MouseButton1
+            or input.UserInputType == Enum.UserInputType.Touch then
+            drag = true
+            setPercent(input.Position.X)
         end
-        return n
-    end
-    return tonumber(val) or 0
+    end)
+
+    UserInputService.InputChanged:Connect(function(input)
+        if drag and (
+            input.UserInputType == Enum.UserInputType.MouseMovement
+            or input.UserInputType == Enum.UserInputType.Touch
+        ) then
+            setPercent(input.Position.X)
+        end
+    end)
+
+    UserInputService.InputEnded:Connect(function(input)
+        if input.UserInputType == Enum.UserInputType.MouseButton1
+            or input.UserInputType == Enum.UserInputType.Touch then
+            drag = false
+        end
+    end)
+
+    return holder
 end
 
-local function getPlayerCoins()
-    local leaderstats = LocalPlayer:FindFirstChild("leaderstats")
-    if leaderstats and leaderstats:FindFirstChild("Coins") then
-        return parseNumber(leaderstats.Coins.Value)
-    end
-    return 0
+--==================================================
+-- HOME PAGE
+--==================================================
+
+local HomePage = createPage("Home")
+
+createPageHeader(
+    HomePage,
+    "Home",
+    "Open Sea For Animals interface",
+    ICONS.Home
+)
+
+local HomePanel = createPanel(
+    HomePage,
+    UDim2.fromOffset(15, 70),
+    UDim2.new(1, -30, 0, 365),
+    "Welcome",
+    ICONS.Home
+)
+
+image(
+    HomePanel,
+    LOGO_ID,
+    UDim2.new(0.5, -45, 0, 55),
+    UDim2.fromOffset(90, 90),
+    COLORS.White
+)
+
+local welcome = label(
+    HomePanel,
+    "Open Sea For Animals",
+    UDim2.fromOffset(0, 155),
+    UDim2.new(1, 0, 0, 28),
+    18,
+    COLORS.Text,
+    Enum.Font.GothamBold
+)
+welcome.TextXAlignment = Enum.TextXAlignment.Center
+
+local welcomeSub = label(
+    HomePanel,
+    "UI preview — features are intentionally not connected yet.",
+    UDim2.fromOffset(0, 187),
+    UDim2.new(1, 0, 0, 20),
+    9,
+    COLORS.Muted,
+    Enum.Font.Gotham
+)
+welcomeSub.TextXAlignment = Enum.TextXAlignment.Center
+
+--==================================================
+-- AUTO FARM PAGE
+--==================================================
+
+local FarmPage = createPage("Auto Farm")
+
+createPageHeader(
+    FarmPage,
+    "Auto Farm",
+    "Sea harvesting, item, vacuum, and plot automation",
+    ICONS.World
+)
+
+local FarmPanel = createPanel(
+    FarmPage,
+    UDim2.fromOffset(15, 70),
+    UDim2.fromOffset(238, 365),
+    "Auto Farm",
+    ICONS.World
+)
+
+createText(FarmPanel, "Auto Wave Harvest", 20, 39)
+
+createText(FarmPanel, "Wave Power", 20, 62)
+createSlider(FarmPanel, 62, "5", 0.90)
+
+createText(FarmPanel, "Cycle Interval", 20, 98)
+createSlider(FarmPanel, 98, "3s", 0.14)
+
+createText(FarmPanel, "Auto Pickup Nearby Items", 20, 133)
+
+local Pickup = button(
+    FarmPanel,
+    UDim2.fromOffset(20, 153),
+    UDim2.fromOffset(198, 29),
+    "Pickup Nearest Item Now",
+    9
+)
+Pickup.BackgroundTransparency = false
+Pickup.BackgroundColor3 = COLORS.Input
+Pickup.TextColor3 = COLORS.Text2
+corner(Pickup, 5)
+Pickup.MouseEnter:Connect(function()
+    tween(Pickup, {BackgroundColor3 = COLORS.InputHover}, 0.1)
+end)
+Pickup.MouseLeave:Connect(function()
+    tween(Pickup, {BackgroundColor3 = COLORS.Input}, 0.1)
+end)
+
+createText(FarmPanel, "Filter: Animal Name", 20, 190)
+createDropdown(FarmPanel, 210, "All Animals", {
+    "All Animals", "Dog", "Cat", "Bird", "Rabbit"
+})
+
+createText(FarmPanel, "Filter: Egg Name", 20, 246)
+createDropdown(FarmPanel, 266, "All Eggs", {
+    "All Eggs", "Common Egg", "Rare Egg", "Legendary Egg"
+})
+
+createText(FarmPanel, "Filter: Rarity", 20, 302)
+createDropdown(FarmPanel, 322, "All Rarities", {
+    "All Rarities", "Common", "Rare", "Epic", "Legendary"
+})
+
+createText(FarmPanel, "Filter: Mutation", 20, 358)
+createDropdown(FarmPanel, 378, "All Mutations", {
+    "All Mutations", "Normal", "Gold", "Rainbow"
+})
+
+local PlotPanel = createPanel(
+    FarmPage,
+    UDim2.fromOffset(263, 70),
+    UDim2.fromOffset(223, 300),
+    "Plot Automation",
+    ICONS.World
+)
+
+createText(PlotPanel, "Auto Place Eggs", 20, 40)
+
+createText(PlotPanel, "Filter: Egg Name", 20, 63)
+createDropdown(PlotPanel, 83, "All Eggs", {
+    "All Eggs", "Common Egg", "Rare Egg", "Legendary Egg"
+})
+
+createText(PlotPanel, "Filter: Rarity", 20, 119)
+createDropdown(PlotPanel, 139, "All Rarities", {
+    "All Rarities", "Common", "Rare", "Epic", "Legendary"
+})
+
+createText(PlotPanel, "Filter: Mutation", 20, 175)
+createDropdown(PlotPanel, 195, "All Mutations", {
+    "All Mutations", "Normal", "Gold", "Rainbow"
+})
+
+createToggle(PlotPanel, "Auto Hatch Eggs", 226)
+createToggle(PlotPanel, "Auto Equip Best Animals", 248)
+
+createText(PlotPanel, "Equip Interval", 20, 270)
+createSlider(PlotPanel, 270, "6s", 0.23)
+
+local SellPanel = createPanel(
+    FarmPage,
+    UDim2.fromOffset(263, 380),
+    UDim2.fromOffset(223, 120),
+    "Auto Sell Animals",
+    ICONS.World
+)
+
+createToggle(SellPanel, "Auto Sell Animals", 39)
+
+createText(SellPanel, "Sell Below (S/s)", 20, 61)
+createSlider(SellPanel, 61, "0/s", 0.02)
+
+--==================================================
+-- OTHER PAGES
+--==================================================
+
+local function createSimplePage(name, titleText, subtitleText, iconId)
+    local page = createPage(name)
+
+    createPageHeader(page, titleText, subtitleText, iconId)
+
+    local panel = createPanel(
+        page,
+        UDim2.fromOffset(15, 70),
+        UDim2.new(1, -30, 0, 365),
+        titleText,
+        iconId
+    )
+
+    image(
+        panel,
+        iconId,
+        UDim2.new(0.5, -28, 0, 90),
+        UDim2.fromOffset(56, 56),
+        COLORS.Accent
+    )
+
+    local title = label(
+        panel,
+        titleText,
+        UDim2.fromOffset(0, 165),
+        UDim2.new(1, 0, 0, 26),
+        16,
+        COLORS.Text,
+        Enum.Font.GothamBold
+    )
+    title.TextXAlignment = Enum.TextXAlignment.Center
+
+    local desc = label(
+        panel,
+        "This tab is ready for UI controls. No game functionality is connected yet.",
+        UDim2.fromOffset(25, 198),
+        UDim2.new(1, -50, 0, 35),
+        9,
+        COLORS.Muted
+    )
+    desc.TextXAlignment = Enum.TextXAlignment.Center
+    desc.TextWrapped = true
+
+    return page
 end
 
-local function getPlayerRank()
-    local leaderstats = LocalPlayer:FindFirstChild("leaderstats")
-    if leaderstats and leaderstats:FindFirstChild("Rank") then
-        return tostring(leaderstats.Rank.Value)
+local GymPage = createSimplePage(
+    "Gym",
+    "Gym",
+    "Training and progression UI",
+    ICONS.Player
+)
+
+local UpgradePage = createSimplePage(
+    "Upgrades & Progression",
+    "Upgrades & Progression",
+    "Upgrade interface",
+    ICONS.Upgrade
+)
+
+local QuestPage = createSimplePage(
+    "Quests & Boosts",
+    "Quests & Boosts",
+    "Quest and boost interface",
+    ICONS.Quest
+)
+
+local MiscPage = createSimplePage(
+    "Misc",
+    "Misc",
+    "Miscellaneous interface",
+    ICONS.Misc
+)
+
+local SettingsPage = createSimplePage(
+    "Settings",
+    "Settings",
+    "Interface settings",
+    ICONS.Settings
+)
+
+--==================================================
+-- SETTINGS PAGE EXTRA UI
+--==================================================
+
+createToggle(SettingsPage:FindFirstChildWhichIsA("Frame"), "UI Animation", 245)
+
+--==================================================
+-- INITIAL PAGE
+--==================================================
+
+local function selectPage(name)
+    local target = Pages:FindFirstChild(name)
+    if not target then
+        return
     end
-    return ""
+
+    for _, page in ipairs(Pages:GetChildren()) do
+        if page:IsA("Frame") then
+            page.Visible = (page == target)
+        end
+    end
+
+    for pageName, data in pairs(SidebarButtons) do
+        local selected = pageName == name
+
+        data.Holder.BackgroundColor3 = selected
+            and COLORS.AccentDark
+            or COLORS.Sidebar
+
+        data.Icon.ImageColor3 = selected
+            and COLORS.Accent
+            or COLORS.Muted
+
+        data.Text.TextColor3 = selected
+            and COLORS.Text
+            or COLORS.Text2
+    end
+
+    CurrentPage = name
 end
 
-local IslandData = {
-    { name = "Ground (พื้นดิน)", cf = CFrame.new(25, 3, 130) },
-    { name = "Astral Island", cf = CFrame.new(206, 2014, 237) },
-    { name = "Mystic Island", cf = CFrame.new(171, 4047, 52) },
-    { name = "Space Island", cf = CFrame.new(148, 5657, 73) },
-    { name = "Tundra Island", cf = CFrame.new(148, 9285, 73) },
-    { name = "Eternal Island", cf = CFrame.new(148, 13685, 73) },
-    { name = "Sandstorm Island", cf = CFrame.new(148, 17685, 73) },
-    { name = "Thunder Island", cf = CFrame.new(148, 24085, 73) },
-    { name = "Ancient Inferno Island", cf = CFrame.new(148, 28285, 73) },
-    { name = "Midnight Shadow Island", cf = CFrame.new(148, 33285, 73) },
-    { name = "Mythical Souls Island", cf = CFrame.new(148, 39385, 73) },
-    { name = "Winter Wonder Island", cf = CFrame.new(148, 46085, 73) },
-    { name = "Golden Master Island", cf = CFrame.new(148, 52685, 73) },
-    { name = "Dragon Legend Island", cf = CFrame.new(148, 59585, 73) },
-    { name = "Cybernetic Legends Island", cf = CFrame.new(148, 66685, 73) },
-    { name = "Chaos Legends Island", cf = CFrame.new(148, 74485, 73) },
-    { name = "Soul Combustion Island", cf = CFrame.new(148, 82585, 73) },
-    { name = "Legendary Shadow Island", cf = CFrame.new(148, 90985, 73) },
-    { name = "Wonder Island", cf = CFrame.new(148, 99985, 73) },
-    { name = "Midnight Island", cf = CFrame.new(148, 109985, 73) },
-    { name = "Blazing Vortex Island", cf = CFrame.new(148, 120985, 73) }
-}
+selectPage("Auto Farm")
 
-local ShopIslands = {
-    "Ground", "Astral Island", "Mystic Island", "Space Island", "Tundra Island",
-    "Eternal Island", "Sandstorm Island", "Thunder Island", "Ancient Inferno Island",
-    "Midnight Shadow Island", "Mythical Souls Island", "Winter Wonder Island",
-    "Golden Master Island", "Dragon Legend Island", "Cybernetic Legends Island",
-    "Chaos Legends Island", "Soul Combustion Island", "Legendary Shadow Island",
-    "Wonder Island", "Midnight Island", "Blazing Vortex Island"
-}
+--==================================================
+-- CLOSE SEARCH WHEN CLICKING OUTSIDE
+--==================================================
 
-local CrystalsList = {
-    "Blue Crystal", "Purple Crystal", "Orange Crystal", "Enchanted Crystal",
-    "Astral Crystal", "Golden Crystal", "Inferno Crystal", "Galaxy Crystal",
-    "Frozen Crystal", "Eternal Crystal", "Storm Crystal", "Thunder Crystal",
-    "Ancient Crystal", "Midnight Shadow Crystal", "Secret Shadows Crystal",
-    "Electro Legends Crystal", "Mystic Crystal", "Dragon Legend Crystal",
-    "Cybernetic Legends Crystal", "Chaos Legends Crystal", "Soul Combustion Crystal",
-    "Blazing Vortex Crystal"
-}
+UserInputService.InputBegan:Connect(function(input, processed)
+    if processed then
+        return
+    end
 
-local function getAllShopIslands()
-    local result = {}
-    local seen = {}
-    if Workspace:FindFirstChild("islandUnlockParts") then
-        for _, p in ipairs(Workspace.islandUnlockParts:GetChildren()) do
-            if not seen[p.Name:lower()] then
-                seen[p.Name:lower()] = true
-                table.insert(result, p.Name)
+    if input.UserInputType == Enum.UserInputType.MouseButton1
+        or input.UserInputType == Enum.UserInputType.Touch then
+
+        if SearchOverlay.Visible then
+            local mousePos = input.Position
+            local pos = SearchOverlay.AbsolutePosition
+            local size = SearchOverlay.AbsoluteSize
+
+            local inside =
+                mousePos.X >= pos.X and
+                mousePos.X <= pos.X + size.X and
+                mousePos.Y >= pos.Y and
+                mousePos.Y <= pos.Y + size.Y
+
+            if not inside then
+                SearchOverlay.Visible = false
             end
         end
     end
-    for _, name in ipairs(ShopIslands) do
-        if not seen[name:lower()] then
-            seen[name:lower()] = true
-            table.insert(result, name)
-        end
-    end
-    return result
-end
-
--- ==================== TABS CONTENT ==================== --
--- TAB 1: AUTO FARM & SHOP
-local farmPage = createTab("Auto Farm", "⚔️", "Auto Farm & Shop", "ระบบฟาร์ม, ซื้อของทุกเกาะ, และขายเกาะสูงสุด")
-local leftColFarm = createColumnCard(farmPage, "Ninja Farming (ระบบฟาร์ม)", 0, 0.485)
-local rightColFarm = createColumnCard(farmPage, "Shop & Ranks (ซื้ออัตโนมัติ)", 0.515, 0.485)
-
-addToggle(leftColFarm, "⚡ Auto Swing (ฟันดาบออโต้)", false, function(v)
-    Flags.AutoSwing = v
 end)
 
-addToggle(leftColFarm, "💎 Auto Sell Max Island (ขายคูณสูงสุด)", false, function(v)
-    Flags.AutoSellMax = v
-end)
+--==================================================
+-- TOP EDGE ACCENT
+--==================================================
 
-addToggle(leftColFarm, "☯️ Auto Farm Chi (ฟาร์มหยินหยาง)", false, function(v)
-    Flags.AutoFarmChi = v
-end)
+local TopAccent = Instance.new("Frame")
+TopAccent.Size = UDim2.new(1, 0, 0, 2)
+TopAccent.Position = UDim2.fromOffset(0, 0)
+TopAccent.BackgroundColor3 = COLORS.Accent
+TopAccent.BackgroundTransparency = 0.25
+TopAccent.BorderSizePixel = 0
+TopAccent.ZIndex = 100
+TopAccent.Parent = Main
 
-addButton(leftColFarm, "🎁 Claim All Chi Chests (รับกล่อง Chi)", function()
-    pcall(function()
-        local hrp = LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("HumanoidRootPart")
-        if hrp and firetouchinterest then
-            for _, obj in ipairs(Workspace:GetDescendants()) do
-                if obj:IsA("BasePart") and (string.find(string.lower(obj.Name), "chest") or string.find(string.lower(obj.Name), "circleinner")) then
-                    firetouchinterest(hrp, obj, 0)
-                    task.wait(0.01)
-                    firetouchinterest(hrp, obj, 1)
-                end
-            end
-        end
-    end)
-end)
-
-addButton(leftColFarm, "☁️ Unlock All Islands (เปิดทุกเกาะ)", function()
-    pcall(function()
-        if Workspace:FindFirstChild("islandUnlockParts") and LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("HumanoidRootPart") then
-            local hrp = LocalPlayer.Character.HumanoidRootPart
-            for _, part in ipairs(Workspace.islandUnlockParts:GetChildren()) do
-                if part:IsA("BasePart") and firetouchinterest then
-                    firetouchinterest(hrp, part, 0)
-                    task.wait(0.01)
-                    firetouchinterest(hrp, part, 1)
-                end
-            end
-        end
-    end)
-end)
-
-addToggle(leftColFarm, "🦘 Infinite Jump (กระโดดไม่จำกัด)", false, function(v)
-    Flags.InfJump = v
-end)
-
-addToggle(rightColFarm, "👑 Auto Buy Next Class (ตังถึงซื้อเลย)", false, function(v)
-    Flags.AutoBuyNextClass = v
-end)
-
-addToggle(rightColFarm, "🗡️ Auto Buy Swords (ดาบทุกเกาะ)", false, function(v)
-    Flags.AutoBuyAllSwords = v
-end)
-
-addToggle(rightColFarm, "🥋 Auto Buy Belts (เข็มขัดทุกเกาะ)", false, function(v)
-    Flags.AutoBuyAllBelts = v
-end)
-
-addToggle(rightColFarm, "📜 Auto Buy Skills (สกิลทุกเกาะ)", false, function(v)
-    Flags.AutoBuyAllSkills = v
-end)
-
--- TAB 2: BOSS FARM (ฟาร์มบอส ตีเร็ว ลอยตัวเหนือหัวอมตะ)
-local bossPage = createTab("Boss Farm", "👹", "Auto Boss Farm", "ระบบฟาร์มบอสความเร็วสูง ตีรัวเหนือหัวบอสแบบอมตะ 100%")
-local bossCol1 = createColumnCard(bossPage, "Boss Automation (ตั้งค่าบอส)", 0, 0.485)
-local bossCol2 = createColumnCard(bossPage, "Quick Boss Teleport (วาร์ปบอส)", 0.515, 0.485)
-
-addDropdown(bossCol1, "เลือกบอส", BossOptions, "All Bosses", function(selected)
-    Flags.SelectedBoss = selected
-end)
-
-addToggle(bossCol1, "🔥 Auto Farm Boss (ฟาร์มบอสอัตโนมัติ)", false, function(v)
-    Flags.AutoBossFarm = v
-end)
-
-addSlider(bossCol1, "Attack Burst (ความเร็วรอบตี)", 1, 10, 5, function(val)
-    Flags.BossAttackSpeed = val
-end)
-
--- TAB 3: PETS & STATS BOOSTER (สุ่มสัตว์, เร่งเวลตันไว, อัปเกรดสเตตัสสูงสุด)
-local petPage = createTab("Pets & Stats", "🐾", "Pets & Stats Boost", "สุ่มไข่, เร่ง EXP สัตว์ตันไว, และอัปเกรดสเตตัสขั้นสูงสุด")
-local petCol1 = createColumnCard(petPage, "Crystal Selector (เลือกตู้สุ่ม)", 0, 0.485)
-local petCol2 = createColumnCard(petPage, "Stats & Level Glitch (อัปสเตตัส)", 0.515, 0.485)
-
-addDropdown(petCol1, "ตู้ที่เลือก", CrystalsList, "Blue Crystal", function(selected)
-    Flags.SelectedCrystal = selected
-end)
-
-addToggle(petCol1, "✨ Auto Open Crystal (เปิดตู้อัตโนมัติ)", false, function(v)
-    Flags.AutoOpenCrystal = v
-end)
-
-addToggle(petCol2, "🚀 Fast Pet Level Boost (เร่ง EXP สัตว์ตัน)", false, function(v)
-    Flags.FastPetLevelBoost = v
-end)
-
-addToggle(petCol2, "👑 Auto Max Upgrades (วนอัปสเตตัสสูงสุด)", false, function(v)
-    Flags.AutoMaxPetUpgrades = v
-end)
-
-addButton(petCol2, "🧬 Auto Evolve Pets (ขั้นวิวัฒนาการ)", function()
-    pcall(function()
-        if LocalPlayer:FindFirstChild("ninjaEvent") then
-            LocalPlayer.ninjaEvent:FireServer("autoEvolvePets")
-        end
-    end)
-end)
-
-addButton(petCol2, "🔮 Auto Eternalize Pets (ขั้นนิรันดร์)", function()
-    pcall(function()
-        if LocalPlayer:FindFirstChild("ninjaEvent") then
-            LocalPlayer.ninjaEvent:FireServer("autoEternalizePets")
-        end
-    end)
-end)
-
-addButton(petCol2, "⚡ Auto Immortalize Pets (ขั้นอมตะ)", function()
-    pcall(function()
-        if LocalPlayer:FindFirstChild("ninjaEvent") then
-            LocalPlayer.ninjaEvent:FireServer("autoImmortalizePets")
-        end
-    end)
-end)
-
-addButton(petCol2, "🌟 Auto Legend Pets (ขั้นตำนาน)", function()
-    pcall(function()
-        if LocalPlayer:FindFirstChild("ninjaEvent") then
-            LocalPlayer.ninjaEvent:FireServer("autoLegendPets")
-        end
-    end)
-end)
-
-addButton(petCol2, "🔥 Auto Elementalize Pets (ขั้นมหาธาตุ)", function()
-    pcall(function()
-        if LocalPlayer:FindFirstChild("ninjaEvent") then
-            LocalPlayer.ninjaEvent:FireServer("autoElementalizePets")
-        end
-    end)
-end)
-
--- TAB 4: TELEPORT ISLANDS
-local tpPage = createTab("Teleport", "🌌", "Island Teleport", "เทเลพอร์ตไปยังเกาะต่างๆ ทันที")
-local tpCol1 = createColumnCard(tpPage, "Lower & Mid (เกาะ 1 - 10)", 0, 0.485)
-local tpCol2 = createColumnCard(tpPage, "High & Legendary (เกาะระดับสูง)", 0.515, 0.485)
-
-local function teleportToIsland(cf, islandName)
-    pcall(function()
-        if LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("HumanoidRootPart") then
-            local hrp = LocalPlayer.Character.HumanoidRootPart
-            local targetPart = nil
-            if Workspace:FindFirstChild("islandUnlockParts") then
-                for _, p in ipairs(Workspace.islandUnlockParts:GetChildren()) do
-                    if string.find(string.lower(p.Name), string.lower(islandName)) then
-                        targetPart = p
-                        break
-                    end
-                end
-            end
-            if targetPart then
-                hrp.CFrame = targetPart.CFrame + Vector3.new(0, 5, 0)
-            else
-                hrp.CFrame = cf + Vector3.new(0, 5, 0)
-            end
-        end
-    end)
-end
-
-for idx, data in ipairs(IslandData) do
-    local targetCol = (idx <= 10) and tpCol1 or tpCol2
-    addButton(targetCol, "📍 " .. data.name, function()
-        teleportToIsland(data.cf, data.name)
-    end)
-end
-
--- TAB 5: MOVEMENT & FLY
-local movePage = createTab("Movement", "⚡", "Speed & Fly Hacks", "ระบบปรับความเร็วการเดิน และบินปรับสปีดได้")
-local moveCol1 = createColumnCard(movePage, "WalkSpeed (เดินเร็ว)", 0, 0.485)
-local moveCol2 = createColumnCard(movePage, "Fly System (ระบบบิน)", 0.515, 0.485)
-
-addToggle(moveCol1, "🏃 Enable WalkSpeed (เปิดเดินเร็ว)", false, function(v)
-    Flags.WalkSpeedEnabled = v
-    if not v and LocalPlayer.Character and LocalPlayer.Character:FindFirstChildOfClass("Humanoid") then
-        LocalPlayer.Character:FindFirstChildOfClass("Humanoid").WalkSpeed = 16
-    end
-end)
-
-addSlider(moveCol1, "Speed Multiplier", 16, 350, 16, function(val)
-    Flags.WalkSpeedValue = val
-    if Flags.WalkSpeedEnabled and LocalPlayer.Character and LocalPlayer.Character:FindFirstChildOfClass("Humanoid") then
-        LocalPlayer.Character:FindFirstChildOfClass("Humanoid").WalkSpeed = val
-    end
-end)
-
-addToggle(moveCol2, "🕊️ Enable Fly (เปิดระบบบิน)", false, function(v)
-    Flags.FlyEnabled = v
-end)
-
-addSlider(moveCol2, "Fly Speed", 20, 300, 50, function(val)
-    Flags.FlySpeed = val
-end)
-
--- ==================== BACKGROUND ENGINES ==================== --
-
--- 1. Auto Swing (ฟันดาบ)
-task.spawn(function()
-    while true do
-        if Flags.AutoSwing then
-            pcall(function()
-                local char = LocalPlayer.Character
-                if char then
-                    local tool = char:FindFirstChildOfClass("Tool")
-                    if not tool then
-                        local backpackTool = LocalPlayer.Backpack:FindFirstChildOfClass("Tool")
-                        if backpackTool then
-                            backpackTool.Parent = char
-                        end
-                    end
-                    if LocalPlayer:FindFirstChild("ninjaEvent") then
-                        LocalPlayer.ninjaEvent:FireServer("swingKatana")
-                    end
-                end
-            end)
-        end
-        task.wait(0.08)
-    end
-end)
-
--- 2. Auto Sell Max (ขายที่จุดคูณสูงที่สุด)
-local function getMaxSellCircle()
-    local bestCircle = nil
-    local maxY = -99999
-    pcall(function()
-        if Workspace:FindFirstChild("sellAreaCircles") then
-            for _, circle in ipairs(Workspace.sellAreaCircles:GetChildren()) do
-                local inner = circle:FindFirstChild("circleInner")
-                if inner and inner:IsA("BasePart") then
-                    if inner.Position.Y > maxY then
-                        maxY = inner.Position.Y
-                        bestCircle = inner
-                    end
-                end
-            end
-        end
-    end)
-    return bestCircle
-end
-
-task.spawn(function()
-    while true do
-        if Flags.AutoSellMax then
-            pcall(function()
-                local circle = getMaxSellCircle()
-                local hrp = LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("HumanoidRootPart")
-                if circle and hrp and firetouchinterest then
-                    firetouchinterest(hrp, circle, 0)
-                    task.wait(0.01)
-                    firetouchinterest(hrp, circle, 1)
-                end
-            end)
-        end
-        task.wait(0.35)
-    end
-end)
-
--- 3. Auto Farm Chi (ฟาร์มหยินหยาง)
-task.spawn(function()
-    while true do
-        if Flags.AutoFarmChi then
-            pcall(function()
-                local hrp = LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("HumanoidRootPart")
-                if hrp and firetouchinterest then
-                    if Workspace:FindFirstChild("spawnedCoins") then
-                        for _, obj in ipairs(Workspace.spawnedCoins:GetDescendants()) do
-                            if not Flags.AutoFarmChi then break end
-                            if obj:IsA("BasePart") then
-                                local parentName = obj.Parent and obj.Parent.Name or ""
-                                if string.find(string.lower(obj.Name), "chi") or string.find(string.lower(parentName), "chi") then
-                                    firetouchinterest(hrp, obj, 0)
-                                    task.wait()
-                                    firetouchinterest(hrp, obj, 1)
-                                end
-                            end
-                        end
-                    end
-
-                    if Workspace:FindFirstChild("Hoops") then
-                        for _, hoop in ipairs(Workspace.Hoops:GetChildren()) do
-                            if not Flags.AutoFarmChi then break end
-                            local touchPart = hoop:FindFirstChild("touchPart") or hoop:FindFirstChildWhichIsA("BasePart")
-                            if touchPart then
-                                firetouchinterest(hrp, touchPart, 0)
-                                task.wait()
-                                firetouchinterest(hrp, touchPart, 1)
-                            end
-                        end
-                    end
-                end
-            end)
-        end
-        task.wait(0.4)
-    end
-end)
-
--- 4. Auto Buy Next Class (ตังถึงซื้อเลย)
-task.spawn(function()
-    while true do
-        if Flags.AutoBuyNextClass then
-            pcall(function()
-                if LocalPlayer:FindFirstChild("ninjaEvent") then
-                    local currentCoins = getPlayerCoins()
-                    local currentRank = getPlayerRank()
-                    
-                    local currentIndex = 0
-                    for idx, rankInfo in ipairs(OrderedRanks) do
-                        if string.lower(rankInfo.name) == string.lower(currentRank) then
-                            currentIndex = idx
-                            break
-                        end
-                    end
-
-                    local nextRank = OrderedRanks[currentIndex + 1]
-                    if nextRank then
-                        if currentCoins >= nextRank.cost then
-                            LocalPlayer.ninjaEvent:FireServer("buyRank", nextRank.name)
-                        end
-                    else
-                        for _, r in ipairs(OrderedRanks) do
-                            if currentCoins >= r.cost and r.cost > 0 then
-                                LocalPlayer.ninjaEvent:FireServer("buyRank", r.name)
-                            end
-                        end
-                    end
-                end
-            end)
-        end
-        task.wait(0.5)
-    end
-end)
-
--- 5. Auto Buy Swords ทุกเกาะ
-task.spawn(function()
-    while true do
-        if Flags.AutoBuyAllSwords then
-            pcall(function()
-                if LocalPlayer:FindFirstChild("ninjaEvent") then
-                    local islands = getAllShopIslands()
-                    for _, island in ipairs(islands) do
-                        if not Flags.AutoBuyAllSwords then break end
-                        LocalPlayer.ninjaEvent:FireServer("buyAllSwords", island)
-                        task.wait(0.04)
-                    end
-                end
-            end)
-        end
-        task.wait(0.8)
-    end
-end)
-
--- 6. Auto Buy Belts ทุกเกาะ
-task.spawn(function()
-    while true do
-        if Flags.AutoBuyAllBelts then
-            pcall(function()
-                if LocalPlayer:FindFirstChild("ninjaEvent") then
-                    local islands = getAllShopIslands()
-                    for _, island in ipairs(islands) do
-                        if not Flags.AutoBuyAllBelts then break end
-                        LocalPlayer.ninjaEvent:FireServer("buyAllBelts", island)
-                        task.wait(0.04)
-                    end
-                end
-            end)
-        end
-        task.wait(0.8)
-    end
-end)
-
--- 7. Auto Buy Skills ทุกเกาะ
-task.spawn(function()
-    while true do
-        if Flags.AutoBuyAllSkills then
-            pcall(function()
-                if LocalPlayer:FindFirstChild("ninjaEvent") then
-                    local islands = getAllShopIslands()
-                    for _, island in ipairs(islands) do
-                        if not Flags.AutoBuyAllSkills then break end
-                        LocalPlayer.ninjaEvent:FireServer("buyAllSkills", island)
-                        task.wait(0.04)
-                    end
-                end
-            end)
-        end
-        task.wait(1)
-    end
-end)
-
--- 8. Auto Open Selected Crystal
-task.spawn(function()
-    while true do
-        if Flags.AutoOpenCrystal then
-            pcall(function()
-                if LocalPlayer:FindFirstChild("ninjaEvent") and Flags.SelectedCrystal then
-                    LocalPlayer.ninjaEvent:FireServer("openCrystal", Flags.SelectedCrystal)
-                end
-            end)
-        end
-        task.wait(0.65)
-    end
-end)
-
--- ==================== BOSS FARM ENGINE ==================== --
-local function findBossModel(name)
-    local targetNames = {}
-    if name == "Robot Boss" then
-        targetNames = { "robotboss", "robot" }
-    elseif name == "Eternal Boss" then
-        targetNames = { "eternalboss", "eternal" }
-    elseif name == "Ancient Magma Boss" then
-        targetNames = { "ancientmagmaboss", "magmaboss", "ancientboss" }
-    end
-
-    local function checkMatch(obj)
-        if obj:IsA("Model") then
-            local objName = string.lower(obj.Name)
-            for _, t in ipairs(targetNames) do
-                if string.find(objName, t) then
-                    return true
-                end
-            end
-        end
-        return false
-    end
-
-    if Workspace:FindFirstChild("bossFolder") then
-        for _, b in ipairs(Workspace.bossFolder:GetChildren()) do
-            if checkMatch(b) then return b end
-        end
-    end
-    for _, b in ipairs(Workspace:GetChildren()) do
-        if checkMatch(b) then return b end
-    end
-    return nil
-end
-
-local function getTargetBoss()
-    if Flags.SelectedBoss == "All Bosses" then
-        local order = { "Ancient Magma Boss", "Eternal Boss", "Robot Boss" }
-        for _, bName in ipairs(order) do
-            local model = findBossModel(bName)
-            if model then
-                local hum = model:FindFirstChildOfClass("Humanoid")
-                if hum and hum.Health > 0 then
-                    return model
-                end
-            end
-        end
-        return nil
-    else
-        local model = findBossModel(Flags.SelectedBoss)
-        if model then
-            local hum = model:FindFirstChildOfClass("Humanoid")
-            if hum and hum.Health > 0 then
-                return model
-            end
-        end
-        return nil
-    end
-end
-
--- Boss TP Buttons in UI
-addButton(bossCol2, "📍 TP to Robot Boss", function()
-    local b = findBossModel("Robot Boss")
-    local hrp = LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("HumanoidRootPart")
-    if b and hrp then
-        local bHrp = b:FindFirstChild("HumanoidRootPart") or b:FindFirstChildWhichIsA("BasePart")
-        if bHrp then hrp.CFrame = bHrp.CFrame + Vector3.new(0, 15, 0) end
-    end
-end)
-
-addButton(bossCol2, "📍 TP to Eternal Boss", function()
-    local b = findBossModel("Eternal Boss")
-    local hrp = LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("HumanoidRootPart")
-    if b and hrp then
-        local bHrp = b:FindFirstChild("HumanoidRootPart") or b:FindFirstChildWhichIsA("BasePart")
-        if bHrp then hrp.CFrame = bHrp.CFrame + Vector3.new(0, 15, 0) end
-    end
-end)
-
-addButton(bossCol2, "📍 TP to Magma Boss", function()
-    local b = findBossModel("Ancient Magma Boss")
-    local hrp = LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("HumanoidRootPart")
-    if b and hrp then
-        local bHrp = b:FindFirstChild("HumanoidRootPart") or b:FindFirstChildWhichIsA("BasePart")
-        if bHrp then hrp.CFrame = bHrp.CFrame + Vector3.new(0, 15, 0) end
-    end
-end)
-
--- Main Boss Loop (ฟาร์มเร็ว ตีรัว ลอยตัวเหนือหัวบอสแบบอมตะ 100%)
-task.spawn(function()
-    while true do
-        if Flags.AutoBossFarm then
-            pcall(function()
-                local boss = getTargetBoss()
-                local char = LocalPlayer.Character
-                if boss and char and char:FindFirstChild("HumanoidRootPart") then
-                    local hrp = char.HumanoidRootPart
-                    local bHrp = boss:FindFirstChild("HumanoidRootPart") or boss:FindFirstChild("UpperTorso") or boss:FindFirstChild("Head") or boss:FindFirstChildWhichIsA("BasePart")
-                    
-                    if bHrp then
-                        -- ล็อกตำแหน่งลอยเหนือหัวบอส 14 studs เพื่อให้ไม่โดนดาเมจตีสวน
-                        hrp.CFrame = CFrame.new(bHrp.Position + Vector3.new(0, 14, 0), bHrp.Position)
-                        hrp.Velocity = Vector3.new(0, 0, 0)
-
-                        -- ถืออาวุธอัตโนมัติ
-                        local tool = char:FindFirstChildOfClass("Tool")
-                        if not tool then
-                            local backpackTool = LocalPlayer.Backpack:FindFirstChildOfClass("Tool")
-                            if backpackTool then backpackTool.Parent = char end
-                        end
-
-                        -- ยิงคำสั่งโจมตีรัวๆ ตามระดับ Attack Burst
-                        if LocalPlayer:FindFirstChild("ninjaEvent") then
-                            for _ = 1, math.clamp(Flags.BossAttackSpeed, 1, 10) do
-                                LocalPlayer.ninjaEvent:FireServer("swingKatana")
-                            end
-                        end
-                    end
-                end
-            end)
-        end
-        task.wait(0.06)
-    end
-end)
-
--- ==================== PET EXP & STATS BOOST ENGINE ==================== --
--- เร่งเลเวลสัตว์เลี้ยงตันไว: ยิงคำสั่งแกว่งดาบและกิน Chi รัวๆ เพื่อปั๊ม EXP ให้สัตว์ที่ใส่อยู่เลเวล 100 ไวที่สุด
-task.spawn(function()
-    while true do
-        if Flags.FastPetLevelBoost then
-            pcall(function()
-                local char = LocalPlayer.Character
-                if char and LocalPlayer:FindFirstChild("ninjaEvent") then
-                    local tool = char:FindFirstChildOfClass("Tool")
-                    if not tool then
-                        local backpackTool = LocalPlayer.Backpack:FindFirstChildOfClass("Tool")
-                        if backpackTool then backpackTool.Parent = char end
-                    end
-                    for _ = 1, 4 do
-                        LocalPlayer.ninjaEvent:FireServer("swingKatana")
-                    end
-                end
-            end)
-        end
-        task.wait(0.05)
-    end
-end)
-
--- วนอัปเกรดเลื่อนขั้นสเตตัสสัตว์เลี้ยงทุกระดับอัตโนมัติ (Evolve -> Eternal -> Immortal -> Legend -> Elemental)
-task.spawn(function()
-    while true do
-        if Flags.AutoMaxPetUpgrades then
-            pcall(function()
-                if LocalPlayer:FindFirstChild("ninjaEvent") then
-                    LocalPlayer.ninjaEvent:FireServer("autoEvolvePets")
-                    task.wait(0.1)
-                    LocalPlayer.ninjaEvent:FireServer("autoEternalizePets")
-                    task.wait(0.1)
-                    LocalPlayer.ninjaEvent:FireServer("autoImmortalizePets")
-                    task.wait(0.1)
-                    LocalPlayer.ninjaEvent:FireServer("autoLegendPets")
-                    task.wait(0.1)
-                    LocalPlayer.ninjaEvent:FireServer("autoElementalizePets")
-                end
-            end)
-        end
-        task.wait(1.5)
-    end
-end)
-
--- ==================== MOVEMENT ENGINE ==================== --
-RunService.Stepped:Connect(function()
-    if Flags.WalkSpeedEnabled and LocalPlayer.Character and LocalPlayer.Character:FindFirstChildOfClass("Humanoid") then
-        LocalPlayer.Character:FindFirstChildOfClass("Humanoid").WalkSpeed = Flags.WalkSpeedValue
-    end
-end)
-
-local flyBV, flyBG
-RunService.RenderStepped:Connect(function()
-    local char = LocalPlayer.Character
-    if not char or not char:FindFirstChild("HumanoidRootPart") or not char:FindFirstChildOfClass("Humanoid") then return end
-    local hrp = char.HumanoidRootPart
-    local hum = char:FindFirstChildOfClass("Humanoid")
-
-    if Flags.FlyEnabled then
-        if not flyBV or flyBV.Parent ~= hrp then
-            flyBV = Instance.new("BodyVelocity")
-            flyBV.MaxForce = Vector3.new(9e9, 9e9, 9e9)
-            flyBV.Velocity = Vector3.new(0, 0, 0)
-            flyBV.Parent = hrp
-        end
-        if not flyBG or flyBG.Parent ~= hrp then
-            flyBG = Instance.new("BodyGyro")
-            flyBG.MaxTorque = Vector3.new(9e9, 9e9, 9e9)
-            flyBG.CFrame = hrp.CFrame
-            flyBG.Parent = hrp
-        end
-
-        hum.PlatformStand = true
-        local cam = Workspace.CurrentCamera
-        local moveDir = hum.MoveDirection
-
-        if moveDir.Magnitude > 0 then
-            flyBV.Velocity = (cam.CFrame.LookVector * (moveDir.Z < 0 and 1 or (moveDir.Z > 0 and -1 or 0))
-                + cam.CFrame.RightVector * (moveDir.X > 0 and 1 or (moveDir.X < 0 and -1 or 0))).Unit * Flags.FlySpeed
-        else
-            flyBV.Velocity = Vector3.new(0, 0, 0)
-        end
-        flyBG.CFrame = cam.CFrame
-    else
-        if flyBV then flyBV:Destroy() flyBV = nil end
-        if flyBG then flyBG:Destroy() flyBG = nil end
-        hum.PlatformStand = false
-    end
-end)
-
-UserInputService.JumpRequest:Connect(function()
-    if Flags.InfJump and LocalPlayer.Character and LocalPlayer.Character:FindFirstChildOfClass("Humanoid") then
-        LocalPlayer.Character:FindFirstChildOfClass("Humanoid"):ChangeState(Enum.HumanoidStateType.Jumping)
-    end
-end)
-
--- เปิดแท็บแรกเป็นค่าเริ่มต้น
-switchTab("Auto Farm", "Auto Farm & Shop", "ฟาร์มดาบ, หยินหยาง (Chi), ซื้อทุกเกาะ และขายเกาะสูงสุด")
+--==================================================
+-- DONE
+--==================================================
