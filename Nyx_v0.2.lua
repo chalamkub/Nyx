@@ -1,315 +1,308 @@
--- [[ Nexus Hub - Fisch System Script ]] --
--- รองรับการปรับแต่ง Logo, คีย์ลัดเปิด/ปิดเมนู, และฟังก์ชันพื้นฐาน
+--[[
+    Blox Fruits GUI Template (Roblox Lua)
+    - โลโก้: rbxassetid://134813417493601
+    - ปุ่มเปิด/ปิด GUI (ลอยอยู่มุมจอ) + ปุ่ม Toggle ในเมนู
+    - ใส่โค้ดฟีเจอร์ของคุณเองได้ในส่วน FEATURES
+
+    วิธีใช้: วางไว้ใน StarterPlayerScripts (LocalScript) ของเกม/แมพของคุณ
+    หมายเหตุ: สคริปต์นี้เป็นโครง UI ที่ทำงานได้จริง ไม่มีโค้ดโกงเกมของผู้อื่น
+]]
 
 local Players = game:GetService("Players")
-local UserInputService = game:GetService("UserInputService")
 local TweenService = game:GetService("TweenService")
+local UserInputService = game:GetService("UserInputService")
 local RunService = game:GetService("RunService")
-local VirtualInputManager = game:GetService("VirtualInputManager")
 
-local LocalPlayer = Players.LocalPlayer
-local PlayerGui = LocalPlayer:WaitForChild("PlayerGui")
+local player = Players.LocalPlayer
+local LOGO_ID = "rbxassetid://134813417493601"
 
--- // CONFIGURATION // --
-local CONFIG = {
-    HubName = "NYX HUB - FISCH",
-    LogoId = "rbxassetid://134813417493601", -- เปลี่ยนเป็น Asset ID โลโก้ของคุณได้ที่นี่
-    ToggleKey = Enum.KeyCode.RightControl, -- ปุ่มเปิด/ปิดเมนู
-    AutoCast = false,
-    AutoShake = false,
-    AutoReel = false,
-    FishESP = false
+----------------------------------------------------------------
+-- THEME
+----------------------------------------------------------------
+local THEME = {
+    bg       = Color3.fromRGB(18, 20, 28),
+    panel    = Color3.fromRGB(26, 29, 40),
+    stroke   = Color3.fromRGB(58, 64, 84),
+    accent   = Color3.fromRGB(0, 200, 160),
+    off      = Color3.fromRGB(70, 75, 95),
+    text     = Color3.fromRGB(235, 238, 245),
+    subtext  = Color3.fromRGB(150, 158, 178),
 }
 
--- // CREATE SCREEN GUI // --
-local ScreenGui = Instance.new("ScreenGui")
-ScreenGui.Name = "NexusHub_Fisch"
-ScreenGui.ResetOnSpawn = false
-ScreenGui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
-ScreenGui.Parent = PlayerGui
-
--- // FLOATING TOGGLE BUTTON // --
-local ToggleBtn = Instance.new("ImageButton")
-ToggleBtn.Name = "LogoToggleButton"
-ToggleBtn.Size = UDim2.new(0, 50, 0, 50)
-ToggleBtn.Position = UDim2.new(0, 20, 0.5, -25)
-ToggleBtn.BackgroundColor3 = Color3.fromRGB(25, 25, 30)
-ToggleBtn.Image = CONFIG.LogoId
-ToggleBtn.Parent = ScreenGui
-
-local ToggleBtnCorner = Instance.new("UICorner")
-ToggleBtnCorner.CornerRadius = UDim.new(0, 12)
-ToggleBtnCorner.Parent = ToggleBtn
-
-local ToggleBtnStroke = Instance.new("UIStroke")
-ToggleBtnStroke.Color = Color3.fromRGB(0, 170, 255)
-ToggleBtnStroke.Thickness = 2
-ToggleBtnStroke.Parent = ToggleBtn
-
--- // MAIN FRAME // --
-local MainFrame = Instance.new("Frame")
-MainFrame.Name = "MainFrame"
-MainFrame.Size = UDim2.new(0, 480, 0, 320)
-MainFrame.Position = UDim2.new(0.5, -240, 0.5, -160)
-MainFrame.BackgroundColor3 = Color3.fromRGB(20, 20, 25)
-MainFrame.BorderSizePixel = 0
-MainFrame.ClipsDescendants = true
-MainFrame.Parent = ScreenGui
-
-local MainCorner = Instance.new("UICorner")
-MainCorner.CornerRadius = UDim.new(0, 10)
-MainCorner.Parent = MainFrame
-
-local MainStroke = Instance.new("UIStroke")
-MainStroke.Color = Color3.fromRGB(45, 45, 55)
-MainStroke.Thickness = 1.5
-MainStroke.Parent = MainFrame
-
--- // TOP BAR // --
-local TopBar = Instance.new("Frame")
-TopBar.Name = "TopBar"
-TopBar.Size = UDim2.new(1, 0, 0, 45)
-TopBar.BackgroundColor3 = Color3.fromRGB(15, 15, 20)
-TopBar.BorderSizePixel = 0
-TopBar.Parent = MainFrame
-
-local HubLogo = Instance.new("ImageLabel")
-HubLogo.Name = "HubLogo"
-HubLogo.Size = UDim2.new(0, 32, 0, 32)
-HubLogo.Position = UDim2.new(0, 10, 0, 6)
-HubLogo.BackgroundTransparency = 1
-HubLogo.Image = CONFIG.LogoId
-HubLogo.Parent = TopBar
-
-local LogoCorner = Instance.new("UICorner")
-LogoCorner.CornerRadius = UDim.new(0, 6)
-LogoCorner.Parent = HubLogo
-
-local Title = Instance.new("TextLabel")
-Title.Name = "Title"
-Title.Size = UDim2.new(0, 250, 1, 0)
-Title.Position = UDim2.new(0, 50, 0, 0)
-Title.BackgroundTransparency = 1
-Title.Font = Enum.Font.GothamBold
-Title.Text = CONFIG.HubName
-Title.TextColor3 = Color3.fromRGB(255, 255, 255)
-Title.TextSize = 14
-Title.TextXAlignment = Enum.TextXAlignment.Left
-Title.Parent = TopBar
-
-local CloseBtn = Instance.new("TextButton")
-CloseBtn.Name = "CloseBtn"
-CloseBtn.Size = UDim2.new(0, 30, 0, 30)
-CloseBtn.Position = UDim2.new(1, -38, 0, 7)
-CloseBtn.BackgroundColor3 = Color3.fromRGB(35, 35, 45)
-CloseBtn.Font = Enum.Font.GothamBold
-CloseBtn.Text = "X"
-CloseBtn.TextColor3 = Color3.fromRGB(200, 200, 200)
-CloseBtn.TextSize = 14
-CloseBtn.Parent = TopBar
-
-local CloseCorner = Instance.new("UICorner")
-CloseCorner.CornerRadius = UDim.new(0, 6)
-CloseCorner.Parent = CloseBtn
-
--- // DRAGGABLE LOGIC // --
-local dragging, dragInput, dragStart, startPos
-local function update(input)
-    local delta = input.Position - dragStart
-    MainFrame.Position = UDim2.new(startPos.X.Scale, startPos.X.Offset + delta.X, startPos.Y.Scale, startPos.Y.Offset + delta.Y)
+local function corner(parent, r)
+    local c = Instance.new("UICorner")
+    c.CornerRadius = UDim.new(0, r or 10)
+    c.Parent = parent
+    return c
 end
 
-TopBar.InputBegan:Connect(function(input)
-    if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
-        dragging = true
-        dragStart = input.Position
-        startPos = MainFrame.Position
-        input.Changed:Connect(function()
-            if input.UserInputState == Enum.UserInputState.End then
-                dragging = false
-            end
-        end)
+local function stroke(parent, color, thickness)
+    local s = Instance.new("UIStroke")
+    s.Color = color or THEME.stroke
+    s.Thickness = thickness or 1
+    s.Parent = parent
+    return s
+end
+
+----------------------------------------------------------------
+-- ROOT
+----------------------------------------------------------------
+local gui = Instance.new("ScreenGui")
+gui.Name = "BloxFruitsHub"
+gui.ResetOnSpawn = false
+gui.IgnoreGuiInset = true
+gui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
+gui.Parent = player:WaitForChild("PlayerGui")
+
+-- ปุ่มเปิด/ปิดเมนู (ไอคอนโลโก้ลอยอยู่)
+local openBtn = Instance.new("ImageButton")
+openBtn.Name = "OpenButton"
+openBtn.Size = UDim2.fromOffset(54, 54)
+openBtn.Position = UDim2.new(0, 20, 0.5, -27)
+openBtn.BackgroundColor3 = THEME.panel
+openBtn.Image = LOGO_ID
+openBtn.ScaleType = Enum.ScaleType.Fit
+openBtn.AutoButtonColor = true
+openBtn.Parent = gui
+corner(openBtn, 14)
+stroke(openBtn, THEME.accent, 1.5)
+
+-- หน้าต่างหลัก
+local main = Instance.new("Frame")
+main.Name = "Main"
+main.Size = UDim2.fromOffset(380, 300)
+main.Position = UDim2.new(0.5, -190, 0.5, -150)
+main.BackgroundColor3 = THEME.bg
+main.BorderSizePixel = 0
+main.Visible = false
+main.Active = true
+main.Draggable = true -- ลากย้ายได้
+main.Parent = gui
+corner(main, 14)
+stroke(main)
+
+-- แถบหัว + โลโก้
+local header = Instance.new("Frame")
+header.Size = UDim2.new(1, 0, 0, 56)
+header.BackgroundColor3 = THEME.panel
+header.BorderSizePixel = 0
+header.Parent = main
+corner(header, 14)
+
+local headerFix = Instance.new("Frame")
+headerFix.Size = UDim2.new(1, 0, 0, 14)
+headerFix.Position = UDim2.new(0, 0, 1, -14)
+headerFix.BackgroundColor3 = THEME.panel
+headerFix.BorderSizePixel = 0
+headerFix.Parent = header
+
+local logo = Instance.new("ImageLabel")
+logo.Size = UDim2.fromOffset(36, 36)
+logo.Position = UDim2.new(0, 12, 0, 10)
+logo.BackgroundTransparency = 1
+logo.Image = LOGO_ID
+logo.ScaleType = Enum.ScaleType.Fit
+logo.Parent = header
+
+local title = Instance.new("TextLabel")
+title.Size = UDim2.new(1, -110, 0, 22)
+title.Position = UDim2.new(0, 58, 0, 10)
+title.BackgroundTransparency = 1
+title.Font = Enum.Font.GothamBold
+title.TextSize = 16
+title.TextColor3 = THEME.text
+title.TextXAlignment = Enum.TextXAlignment.Left
+title.Text = "BLOX FRUITS HUB"
+title.Parent = header
+
+local subtitle = title:Clone()
+subtitle.Size = UDim2.new(1, -110, 0, 16)
+subtitle.Position = UDim2.new(0, 58, 0, 31)
+subtitle.Font = Enum.Font.Gotham
+subtitle.TextSize = 12
+subtitle.TextColor3 = THEME.subtext
+subtitle.Text = "v1.0 • กด RightShift เพื่อเปิด/ปิด"
+subtitle.Parent = header
+
+local closeBtn = Instance.new("TextButton")
+closeBtn.Size = UDim2.fromOffset(30, 30)
+closeBtn.Position = UDim2.new(1, -40, 0, 13)
+closeBtn.BackgroundColor3 = Color3.fromRGB(45, 50, 66)
+closeBtn.Font = Enum.Font.GothamBold
+closeBtn.TextSize = 16
+closeBtn.TextColor3 = THEME.text
+closeBtn.Text = "X"
+closeBtn.Parent = header
+corner(closeBtn, 8)
+
+-- พื้นที่เนื้อหา (เลื่อนได้)
+local content = Instance.new("ScrollingFrame")
+content.Size = UDim2.new(1, -20, 1, -72)
+content.Position = UDim2.new(0, 10, 0, 64)
+content.BackgroundTransparency = 1
+content.BorderSizePixel = 0
+content.ScrollBarThickness = 4
+content.ScrollBarImageColor3 = THEME.accent
+content.CanvasSize = UDim2.new(0, 0, 0, 0)
+content.AutomaticCanvasSize = Enum.AutomaticSize.Y
+content.Parent = main
+
+local list = Instance.new("UIListLayout")
+list.Padding = UDim.new(0, 8)
+list.SortOrder = Enum.SortOrder.LayoutOrder
+list.Parent = content
+
+----------------------------------------------------------------
+-- TOGGLE COMPONENT
+----------------------------------------------------------------
+local function createToggle(name, default, callback)
+    local row = Instance.new("Frame")
+    row.Size = UDim2.new(1, 0, 0, 44)
+    row.BackgroundColor3 = THEME.panel
+    row.BorderSizePixel = 0
+    row.Parent = content
+    corner(row, 10)
+    stroke(row)
+
+    local label = Instance.new("TextLabel")
+    label.Size = UDim2.new(1, -80, 1, 0)
+    label.Position = UDim2.new(0, 14, 0, 0)
+    label.BackgroundTransparency = 1
+    label.Font = Enum.Font.GothamMedium
+    label.TextSize = 14
+    label.TextColor3 = THEME.text
+    label.TextXAlignment = Enum.TextXAlignment.Left
+    label.Text = name
+    label.Parent = row
+
+    local switch = Instance.new("TextButton")
+    switch.Size = UDim2.fromOffset(46, 24)
+    switch.Position = UDim2.new(1, -60, 0.5, -12)
+    switch.BackgroundColor3 = default and THEME.accent or THEME.off
+    switch.Text = ""
+    switch.AutoButtonColor = false
+    switch.Parent = row
+    corner(switch, 12)
+
+    local knob = Instance.new("Frame")
+    knob.Size = UDim2.fromOffset(18, 18)
+    knob.Position = default and UDim2.new(1, -21, 0.5, -9) or UDim2.new(0, 3, 0.5, -9)
+    knob.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
+    knob.BorderSizePixel = 0
+    knob.Parent = switch
+    corner(knob, 9)
+
+    local state = default
+    local function render()
+        TweenService:Create(switch, TweenInfo.new(0.15), {
+            BackgroundColor3 = state and THEME.accent or THEME.off,
+        }):Play()
+        TweenService:Create(knob, TweenInfo.new(0.15), {
+            Position = state and UDim2.new(1, -21, 0.5, -9) or UDim2.new(0, 3, 0.5, -9),
+        }):Play()
     end
-end)
 
-TopBar.InputChanged:Connect(function(input)
-    if input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch then
-        dragInput = input
-    end
-end)
-
-UserInputService.InputChanged:Connect(function(input)
-    if input == dragInput and dragging then
-        update(input)
-    end
-end)
-
--- // CONTENT LIST // --
-local ContentScroll = Instance.new("ScrollingFrame")
-ContentScroll.Name = "ContentScroll"
-ContentScroll.Size = UDim2.new(1, -20, 1, -55)
-ContentScroll.Position = UDim2.new(0, 10, 0, 50)
-ContentScroll.BackgroundTransparency = 1
-ContentScroll.ScrollBarThickness = 4
-ContentScroll.CanvasSize = UDim2.new(0, 0, 0, 350)
-ContentScroll.Parent = MainFrame
-
-local UIListLayout = Instance.new("UIListLayout")
-UIListLayout.SortOrder = Enum.SortOrder.LayoutOrder
-UIListLayout.Padding = UDim.new(0, 8)
-UIListLayout.Parent = ContentScroll
-
--- // FUNCTION HELPER: CREATE TOGGLE // --
-local function CreateToggle(name, defaultState, callback)
-    local state = defaultState
-    local Button = Instance.new("TextButton")
-    Button.Name = name .. "Toggle"
-    Button.Size = UDim2.new(1, -10, 0, 42)
-    Button.BackgroundColor3 = Color3.fromRGB(28, 28, 35)
-    Button.AutoButtonColor = false
-    Button.Text = ""
-    Button.Parent = ContentScroll
-
-    local Corner = Instance.new("UICorner")
-    Corner.CornerRadius = UDim.new(0, 8)
-    Corner.Parent = Button
-
-    local Label = Instance.new("TextLabel")
-    Label.Size = UDim2.new(1, -70, 1, 0)
-    Label.Position = UDim2.new(0, 12, 0, 0)
-    Label.BackgroundTransparency = 1
-    Label.Font = Enum.Font.GothamMedium
-    Label.Text = name
-    Label.TextColor3 = Color3.fromRGB(230, 230, 230)
-    Label.TextSize = 13
-    Label.TextXAlignment = Enum.TextXAlignment.Left
-    Label.Parent = Button
-
-    local Indicator = Instance.new("Frame")
-    Indicator.Size = UDim2.new(0, 44, 0, 22)
-    Indicator.Position = UDim2.new(1, -54, 0.5, -11)
-    Indicator.BackgroundColor3 = state and Color3.fromRGB(0, 170, 255) or Color3.fromRGB(50, 50, 60)
-    Indicator.Parent = Button
-
-    local IndCorner = Instance.new("UICorner")
-    IndCorner.CornerRadius = UDim.new(1, 0)
-    IndCorner.Parent = Indicator
-
-    local Dot = Instance.new("Frame")
-    Dot.Size = UDim2.new(0, 16, 0, 16)
-    Dot.Position = state and UDim2.new(1, -19, 0.5, -8) or UDim2.new(0, 3, 0.5, -8)
-    Dot.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
-    Dot.Parent = Indicator
-
-    local DotCorner = Instance.new("UICorner")
-    DotCorner.CornerRadius = UDim.new(1, 0)
-    DotCorner.Parent = Dot
-
-    Button.MouseButton1Click:Connect(function()
+    switch.MouseButton1Click:Connect(function()
         state = not state
-        local targetColor = state and Color3.fromRGB(0, 170, 255) or Color3.fromRGB(50, 50, 60)
-        local targetPos = state and UDim2.new(1, -19, 0.5, -8) or UDim2.new(0, 3, 0.5, -8)
-
-        TweenService:Create(Indicator, TweenInfo.new(0.2), {BackgroundColor3 = targetColor}):Play()
-        TweenService:Create(Dot, TweenInfo.new(0.2), {Position = targetPos}):Play()
-
-        callback(state)
+        render()
+        local ok, err = pcall(callback, state)
+        if not ok then warn("[Hub] " .. name .. ": " .. tostring(err)) end
     end)
+
+    if default then
+        task.spawn(function() pcall(callback, true) end)
+    end
+
+    return {
+        Set = function(v) state = v; render(); pcall(callback, v) end,
+        Get = function() return state end,
+    }
 end
 
--- // CREATE TOGGLES // --
-CreateToggle("Auto Cast (เหวี่ยงเบ็ดอัตโนมัติ)", CONFIG.AutoCast, function(val)
-    CONFIG.AutoCast = val
-    if val then
-        task.spawn(function()
-            while CONFIG.AutoCast do
-                local char = LocalPlayer.Character
-                local rod = char and char:FindFirstChildOfClass("Tool")
-                if rod and rod:FindFirstChild("values") and rod.values:FindFirstChild("casted") then
-                    if not rod.values.casted.Value then
-                        rod:Activate()
-                    end
-                end
-                task.wait(1)
-            end
-        end)
-    end
-end)
-
-CreateToggle("Auto Shake (เขย่าเบ็ดอัตโนมัติ)", CONFIG.AutoShake, function(val)
-    CONFIG.AutoShake = val
-    if val then
-        task.spawn(function()
-            while CONFIG.AutoShake do
-                local shakeUI = PlayerGui:FindFirstChild("shake") or PlayerGui:FindFirstChild("ShakeUI")
-                if shakeUI and shakeUI.Enabled then
-                    local button = shakeUI:FindFirstChildWhichIsA("ImageButton", true)
-                    if button and button.Visible then
-                        pcall(function()
-                            button.Position = UDim2.new(0.5, 0, 0.5, 0)
-                            VirtualInputManager:SendMouseButtonEvent(button.AbsolutePosition.X + 10, button.AbsolutePosition.Y + 10, 0, true, game, 0)
-                            VirtualInputManager:SendMouseButtonEvent(button.AbsolutePosition.X + 10, button.AbsolutePosition.Y + 10, 0, false, game, 0)
-                        end)
-                    end
-                end
-                task.wait(0.05)
-            end
-        end)
-    end
-end)
-
-CreateToggle("Auto Reel (ดึงปลาอัตโนมัติ)", CONFIG.AutoReel, function(val)
-    CONFIG.AutoReel = val
-    if val then
-        task.spawn(function()
-            while CONFIG.AutoReel do
-                local reelUI = PlayerGui:FindFirstChild("reel") or PlayerGui:FindFirstChild("ReelUI")
-                if reelUI and reelUI.Enabled then
-                    local bar = reelUI:FindFirstChild("Bar", true)
-                    local target = reelUI:FindFirstChild("Fish", true)
-                    if bar and target then
-                        bar.Position = target.Position
-                    end
-                end
-                task.wait(0.05)
-            end
-        end)
-    end
-end)
-
-CreateToggle("Fishing Zone ESP (แสดงจุดตกปลา)", CONFIG.FishESP, function(val)
-    CONFIG.FishESP = val
-    local zones = workspace:FindFirstChild("zones") or workspace:FindFirstChild("FishingSpots")
-    if zones then
-        for _, zone in pairs(zones:GetChildren()) do
-            if zone:IsA("BasePart") then
-                local highlight = zone:FindFirstChild("ZoneESP")
-                if val and not highlight then
-                    highlight = Instance.new("Highlight")
-                    highlight.Name = "ZoneESP"
-                    highlight.FillColor = Color3.fromRGB(0, 170, 255)
-                    highlight.OutlineColor = Color3.fromRGB(255, 255, 255)
-                    highlight.Parent = zone
-                elseif not val and highlight then
-                    highlight:Destroy()
-                end
-            end
-        end
-    end
-end)
-
--- // TOGGLE MENU VISIBILITY // --
-local function ToggleMenu()
-    MainFrame.Visible = not MainFrame.Visible
+local function createButton(name, callback)
+    local btn = Instance.new("TextButton")
+    btn.Size = UDim2.new(1, 0, 0, 40)
+    btn.BackgroundColor3 = THEME.panel
+    btn.BorderSizePixel = 0
+    btn.Font = Enum.Font.GothamMedium
+    btn.TextSize = 14
+    btn.TextColor3 = THEME.text
+    btn.Text = name
+    btn.Parent = content
+    corner(btn, 10)
+    stroke(btn)
+    btn.MouseButton1Click:Connect(function() pcall(callback) end)
+    return btn
 end
 
-CloseBtn.MouseButton1Click:Connect(ToggleMenu)
-ToggleBtn.MouseButton1Click:Connect(ToggleMenu)
+----------------------------------------------------------------
+-- OPEN / CLOSE
+----------------------------------------------------------------
+local function setOpen(open)
+    if open then
+        main.Visible = true
+        main.Size = UDim2.fromOffset(380, 0)
+        TweenService:Create(main, TweenInfo.new(0.22, Enum.EasingStyle.Quint), {
+            Size = UDim2.fromOffset(380, 300),
+        }):Play()
+    else
+        local t = TweenService:Create(main, TweenInfo.new(0.18, Enum.EasingStyle.Quint), {
+            Size = UDim2.fromOffset(380, 0),
+        })
+        t.Completed:Connect(function() main.Visible = false end)
+        t:Play()
+    end
+end
 
-UserInputService.InputBegan:Connect(function(input, gameProcessed)
-    if not gameProcessed and input.KeyCode == CONFIG.ToggleKey then
-        ToggleMenu()
+openBtn.MouseButton1Click:Connect(function() setOpen(not main.Visible) end)
+closeBtn.MouseButton1Click:Connect(function() setOpen(false) end)
+
+UserInputService.InputBegan:Connect(function(input, gp)
+    if gp then return end
+    if input.KeyCode == Enum.KeyCode.RightShift then
+        setOpen(not main.Visible)
     end
 end)
 
-print("[Nexus Hub]: Fisch Script Loaded Successfully!")
+----------------------------------------------------------------
+-- FEATURES (ใส่โค้ดของคุณในนี้)
+----------------------------------------------------------------
+local character = player.Character or player.CharacterAdded:Wait()
+player.CharacterAdded:Connect(function(c) character = c end)
+
+local function humanoid()
+    return character and character:FindFirstChildOfClass("Humanoid")
+end
+
+-- ตัวอย่าง 1: เดินเร็ว (ทำงานในแมพที่คุณเป็นเจ้าของ)
+local walkLoop
+createToggle("Walk Speed x2", false, function(on)
+    if walkLoop then walkLoop:Disconnect(); walkLoop = nil end
+    local h = humanoid()
+    if on then
+        walkLoop = RunService.Heartbeat:Connect(function()
+            local hh = humanoid()
+            if hh then hh.WalkSpeed = 32 end
+        end)
+    elseif h then
+        h.WalkSpeed = 16
+    end
+end)
+
+-- ตัวอย่าง 2: กระโดดสูง
+createToggle("High Jump", false, function(on)
+    local h = humanoid()
+    if h then h.JumpPower = on and 100 or 50 end
+end)
+
+-- ตัวอย่าง 3: ปุ่มกด
+createButton("Reset Character", function()
+    local h = humanoid()
+    if h then h.Health = 0 end
+end)
+
+-- เพิ่มฟีเจอร์เพิ่มเติมได้ตามต้องการ:
+-- createToggle("ชื่อฟีเจอร์", false, function(on) --[[ โค้ดของคุณ ]] end)
+-- createButton("ชื่อปุ่ม", function() --[[ โค้ดของคุณ ]] end)
+
+print("[Blox Fruits Hub] โหลดสำเร็จ — กด RightShift หรือไอคอนโลโก้เพื่อเปิดเมนู")
