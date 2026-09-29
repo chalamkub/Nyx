@@ -1,109 +1,194 @@
-```lua
--- Violence District Utility Hub (Educational Luau Script)
+-- [[ Nexus Hub - Fisch System Script ]] --
+-- รองรับการปรับแต่ง Logo, คีย์ลัดเปิด/ปิดเมนู, และฟังก์ชันพื้นฐาน
+
 local Players = game:GetService("Players")
-local RunService = game:GetService("RunService")
-local Lighting = game:GetService("Lighting")
+local UserInputService = game:GetService("UserInputService")
 local TweenService = game:GetService("TweenService")
+local RunService = game:GetService("RunService")
+local VirtualInputManager = game:GetService("VirtualInputManager")
 
 local LocalPlayer = Players.LocalPlayer
 local PlayerGui = LocalPlayer:WaitForChild("PlayerGui")
 
--- สร้าง ScreenGui
+-- // CONFIGURATION // --
+local CONFIG = {
+    HubName = "NYX HUB - FISCH",
+    LogoId = "rbxassetid://134813417493601", -- เปลี่ยนเป็น Asset ID โลโก้ของคุณได้ที่นี่
+    ToggleKey = Enum.KeyCode.RightControl, -- ปุ่มเปิด/ปิดเมนู
+    AutoCast = false,
+    AutoShake = false,
+    AutoReel = false,
+    FishESP = false
+}
+
+-- // CREATE SCREEN GUI // --
 local ScreenGui = Instance.new("ScreenGui")
-ScreenGui.Name = "ViolenceDistrictHub"
+ScreenGui.Name = "NexusHub_Fisch"
 ScreenGui.ResetOnSpawn = false
 ScreenGui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
 ScreenGui.Parent = PlayerGui
 
--- Main Window
+-- // FLOATING TOGGLE BUTTON // --
+local ToggleBtn = Instance.new("ImageButton")
+ToggleBtn.Name = "LogoToggleButton"
+ToggleBtn.Size = UDim2.new(0, 50, 0, 50)
+ToggleBtn.Position = UDim2.new(0, 20, 0.5, -25)
+ToggleBtn.BackgroundColor3 = Color3.fromRGB(25, 25, 30)
+ToggleBtn.Image = CONFIG.LogoId
+ToggleBtn.Parent = ScreenGui
+
+local ToggleBtnCorner = Instance.new("UICorner")
+ToggleBtnCorner.CornerRadius = UDim.new(0, 12)
+ToggleBtnCorner.Parent = ToggleBtn
+
+local ToggleBtnStroke = Instance.new("UIStroke")
+ToggleBtnStroke.Color = Color3.fromRGB(0, 170, 255)
+ToggleBtnStroke.Thickness = 2
+ToggleBtnStroke.Parent = ToggleBtn
+
+-- // MAIN FRAME // --
 local MainFrame = Instance.new("Frame")
 MainFrame.Name = "MainFrame"
-MainFrame.Size = UDim2.new(0, 320, 0, 360)
-MainFrame.Position = UDim2.new(0.5, -160, 0.5, -180)
-MainFrame.BackgroundColor3 = Color3.fromRGB(24, 24, 28)
+MainFrame.Size = UDim2.new(0, 480, 0, 320)
+MainFrame.Position = UDim2.new(0.5, -240, 0.5, -160)
+MainFrame.BackgroundColor3 = Color3.fromRGB(20, 20, 25)
 MainFrame.BorderSizePixel = 0
-MainFrame.Active = true
-MainFrame.Draggable = true
+MainFrame.ClipsDescendants = true
 MainFrame.Parent = ScreenGui
 
-local UICorner = Instance.new("UICorner")
-UICorner.CornerRadius = UDim.new(0, 10)
-UICorner.Parent = MainFrame
+local MainCorner = Instance.new("UICorner")
+MainCorner.CornerRadius = UDim.new(0, 10)
+MainCorner.Parent = MainFrame
 
-local UIStroke = Instance.new("UIStroke")
-UIStroke.Color = Color3.fromRGB(255, 65, 65)
-UIStroke.Thickness = 1.5
-UIStroke.Parent = MainFrame
+local MainStroke = Instance.new("UIStroke")
+MainStroke.Color = Color3.fromRGB(45, 45, 55)
+MainStroke.Thickness = 1.5
+MainStroke.Parent = MainFrame
 
--- Header
+-- // TOP BAR // --
+local TopBar = Instance.new("Frame")
+TopBar.Name = "TopBar"
+TopBar.Size = UDim2.new(1, 0, 0, 45)
+TopBar.BackgroundColor3 = Color3.fromRGB(15, 15, 20)
+TopBar.BorderSizePixel = 0
+TopBar.Parent = MainFrame
+
+local HubLogo = Instance.new("ImageLabel")
+HubLogo.Name = "HubLogo"
+HubLogo.Size = UDim2.new(0, 32, 0, 32)
+HubLogo.Position = UDim2.new(0, 10, 0, 6)
+HubLogo.BackgroundTransparency = 1
+HubLogo.Image = CONFIG.LogoId
+HubLogo.Parent = TopBar
+
+local LogoCorner = Instance.new("UICorner")
+LogoCorner.CornerRadius = UDim.new(0, 6)
+LogoCorner.Parent = HubLogo
+
 local Title = Instance.new("TextLabel")
-Title.Size = UDim2.new(1, -20, 0, 40)
-Title.Position = UDim2.new(0, 10, 0, 5)
+Title.Name = "Title"
+Title.Size = UDim2.new(0, 250, 1, 0)
+Title.Position = UDim2.new(0, 50, 0, 0)
 Title.BackgroundTransparency = 1
-Title.Text = "⚡ Violence District Helper"
-Title.TextColor3 = Color3.fromRGB(255, 80, 80)
-Title.TextSize = 18
 Title.Font = Enum.Font.GothamBold
+Title.Text = CONFIG.HubName
+Title.TextColor3 = Color3.fromRGB(255, 255, 255)
+Title.TextSize = 14
 Title.TextXAlignment = Enum.TextXAlignment.Left
-Title.Parent = MainFrame
+Title.Parent = TopBar
 
-local Subtitle = Instance.new("TextLabel")
-Subtitle.Size = UDim2.new(1, -20, 0, 20)
-Subtitle.Position = UDim2.new(0, 10, 0, 35)
-Subtitle.BackgroundTransparency = 1
-Subtitle.Text = "2K Community • Luau Utility"
-Subtitle.TextColor3 = Color3.fromRGB(150, 150, 150)
-Subtitle.TextSize = 12
-Subtitle.Font = Enum.Font.Gotham
-Subtitle.TextXAlignment = Enum.TextXAlignment.Left
-Subtitle.Parent = MainFrame
+local CloseBtn = Instance.new("TextButton")
+CloseBtn.Name = "CloseBtn"
+CloseBtn.Size = UDim2.new(0, 30, 0, 30)
+CloseBtn.Position = UDim2.new(1, -38, 0, 7)
+CloseBtn.BackgroundColor3 = Color3.fromRGB(35, 35, 45)
+CloseBtn.Font = Enum.Font.GothamBold
+CloseBtn.Text = "X"
+CloseBtn.TextColor3 = Color3.fromRGB(200, 200, 200)
+CloseBtn.TextSize = 14
+CloseBtn.Parent = TopBar
 
--- Container
-local Container = Instance.new("ScrollingFrame")
-Container.Size = UDim2.new(1, -20, 1, -75)
-Container.Position = UDim2.new(0, 10, 0, 65)
-Container.BackgroundTransparency = 1
-Container.BorderSizePixel = 0
-Container.ScrollBarThickness = 4
-Container.CanvasSize = UDim2.new(0, 0, 0, 280)
-Container.Parent = MainFrame
+local CloseCorner = Instance.new("UICorner")
+CloseCorner.CornerRadius = UDim.new(0, 6)
+CloseCorner.Parent = CloseBtn
+
+-- // DRAGGABLE LOGIC // --
+local dragging, dragInput, dragStart, startPos
+local function update(input)
+    local delta = input.Position - dragStart
+    MainFrame.Position = UDim2.new(startPos.X.Scale, startPos.X.Offset + delta.X, startPos.Y.Scale, startPos.Y.Offset + delta.Y)
+end
+
+TopBar.InputBegan:Connect(function(input)
+    if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+        dragging = true
+        dragStart = input.Position
+        startPos = MainFrame.Position
+        input.Changed:Connect(function()
+            if input.UserInputState == Enum.UserInputState.End then
+                dragging = false
+            end
+        end)
+    end
+end)
+
+TopBar.InputChanged:Connect(function(input)
+    if input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch then
+        dragInput = input
+    end
+end)
+
+UserInputService.InputChanged:Connect(function(input)
+    if input == dragInput and dragging then
+        update(input)
+    end
+end)
+
+-- // CONTENT LIST // --
+local ContentScroll = Instance.new("ScrollingFrame")
+ContentScroll.Name = "ContentScroll"
+ContentScroll.Size = UDim2.new(1, -20, 1, -55)
+ContentScroll.Position = UDim2.new(0, 10, 0, 50)
+ContentScroll.BackgroundTransparency = 1
+ContentScroll.ScrollBarThickness = 4
+ContentScroll.CanvasSize = UDim2.new(0, 0, 0, 350)
+ContentScroll.Parent = MainFrame
 
 local UIListLayout = Instance.new("UIListLayout")
-UIListLayout.Padding = UDim.new(0, 8)
 UIListLayout.SortOrder = Enum.SortOrder.LayoutOrder
-UIListLayout.Parent = Container
+UIListLayout.Padding = UDim.new(0, 8)
+UIListLayout.Parent = ContentScroll
 
--- ฟังก์ชันสร้างปุ่ม Toggle
-local function createToggleButton(name, defaultState, callback)
+-- // FUNCTION HELPER: CREATE TOGGLE // --
+local function CreateToggle(name, defaultState, callback)
     local state = defaultState
     local Button = Instance.new("TextButton")
-    Button.Size = UDim2.new(1, 0, 0, 42)
-    Button.BackgroundColor3 = Color3.fromRGB(35, 35, 42)
-    Button.BorderSizePixel = 0
+    Button.Name = name .. "Toggle"
+    Button.Size = UDim2.new(1, -10, 0, 42)
+    Button.BackgroundColor3 = Color3.fromRGB(28, 28, 35)
     Button.AutoButtonColor = false
     Button.Text = ""
-    Button.Parent = Container
+    Button.Parent = ContentScroll
 
-    local BtnCorner = Instance.new("UICorner")
-    BtnCorner.CornerRadius = UDim.new(0, 8)
-    BtnCorner.Parent = Button
+    local Corner = Instance.new("UICorner")
+    Corner.CornerRadius = UDim.new(0, 8)
+    Corner.Parent = Button
 
     local Label = Instance.new("TextLabel")
-    Label.Size = UDim2.new(1, -60, 1, 0)
+    Label.Size = UDim2.new(1, -70, 1, 0)
     Label.Position = UDim2.new(0, 12, 0, 0)
     Label.BackgroundTransparency = 1
+    Label.Font = Enum.Font.GothamMedium
     Label.Text = name
     Label.TextColor3 = Color3.fromRGB(230, 230, 230)
     Label.TextSize = 13
-    Label.Font = Enum.Font.GothamSemibold
     Label.TextXAlignment = Enum.TextXAlignment.Left
     Label.Parent = Button
 
     local Indicator = Instance.new("Frame")
-    Indicator.Size = UDim2.new(0, 36, 0, 20)
-    Indicator.Position = UDim2.new(1, -48, 0.5, -10)
-    Indicator.BackgroundColor3 = state and Color3.fromRGB(255, 65, 65) or Color3.fromRGB(60, 60, 65)
-    Indicator.BorderSizePixel = 0
+    Indicator.Size = UDim2.new(0, 44, 0, 22)
+    Indicator.Position = UDim2.new(1, -54, 0.5, -11)
+    Indicator.BackgroundColor3 = state and Color3.fromRGB(0, 170, 255) or Color3.fromRGB(50, 50, 60)
     Indicator.Parent = Button
 
     local IndCorner = Instance.new("UICorner")
@@ -111,10 +196,9 @@ local function createToggleButton(name, defaultState, callback)
     IndCorner.Parent = Indicator
 
     local Dot = Instance.new("Frame")
-    Dot.Size = UDim2.new(0, 14, 0, 14)
-    Dot.Position = state and UDim2.new(1, -17, 0.5, -7) or UDim2.new(0, 3, 0.5, -7)
+    Dot.Size = UDim2.new(0, 16, 0, 16)
+    Dot.Position = state and UDim2.new(1, -19, 0.5, -8) or UDim2.new(0, 3, 0.5, -8)
     Dot.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
-    Dot.BorderSizePixel = 0
     Dot.Parent = Indicator
 
     local DotCorner = Instance.new("UICorner")
@@ -123,113 +207,109 @@ local function createToggleButton(name, defaultState, callback)
 
     Button.MouseButton1Click:Connect(function()
         state = not state
-        local targetColor = state and Color3.fromRGB(255, 65, 65) or Color3.fromRGB(60, 60, 65)
-        local targetPos = state and UDim2.new(1, -17, 0.5, -7) or UDim2.new(0, 3, 0.5, -7)
+        local targetColor = state and Color3.fromRGB(0, 170, 255) or Color3.fromRGB(50, 50, 60)
+        local targetPos = state and UDim2.new(1, -19, 0.5, -8) or UDim2.new(0, 3, 0.5, -8)
 
         TweenService:Create(Indicator, TweenInfo.new(0.2), {BackgroundColor3 = targetColor}):Play()
         TweenService:Create(Dot, TweenInfo.new(0.2), {Position = targetPos}):Play()
 
         callback(state)
     end)
-
-    return Button
 end
 
--- 1. ระบบ ESP (Player Highlight)
-local highlights = {}
-local espEnabled = false
+-- // CREATE TOGGLES // --
+CreateToggle("Auto Cast (เหวี่ยงเบ็ดอัตโนมัติ)", CONFIG.AutoCast, function(val)
+    CONFIG.AutoCast = val
+    if val then
+        task.spawn(function()
+            while CONFIG.AutoCast do
+                local char = LocalPlayer.Character
+                local rod = char and char:FindFirstChildOfClass("Tool")
+                if rod and rod:FindFirstChild("values") and rod.values:FindFirstChild("casted") then
+                    if not rod.values.casted.Value then
+                        rod:Activate()
+                    end
+                end
+                task.wait(1)
+            end
+        end)
+    end
+end)
 
-local function updateHighlight(player)
-    if player == LocalPlayer then return end
-    if espEnabled and player.Character and player.Character:FindFirstChild("HumanoidRootPart") then
-        if not highlights[player] then
-            local hl = Instance.new("Highlight")
-            hl.Name = "ESP_Highlight"
-            hl.FillColor = Color3.fromRGB(255, 50, 50)
-            hl.OutlineColor = Color3.fromRGB(255, 255, 255)
-            hl.FillTransparency = 0.5
-            hl.OutlineTransparency = 0.1
-            hl.Adornee = player.Character
-            hl.Parent = player.Character
-            highlights[player] = hl
-        end
-    else
-        if highlights[player] then
-            highlights[player]:Destroy()
-            highlights[player] = nil
+CreateToggle("Auto Shake (เขย่าเบ็ดอัตโนมัติ)", CONFIG.AutoShake, function(val)
+    CONFIG.AutoShake = val
+    if val then
+        task.spawn(function()
+            while CONFIG.AutoShake do
+                local shakeUI = PlayerGui:FindFirstChild("shake") or PlayerGui:FindFirstChild("ShakeUI")
+                if shakeUI and shakeUI.Enabled then
+                    local button = shakeUI:FindFirstChildWhichIsA("ImageButton", true)
+                    if button and button.Visible then
+                        pcall(function()
+                            button.Position = UDim2.new(0.5, 0, 0.5, 0)
+                            VirtualInputManager:SendMouseButtonEvent(button.AbsolutePosition.X + 10, button.AbsolutePosition.Y + 10, 0, true, game, 0)
+                            VirtualInputManager:SendMouseButtonEvent(button.AbsolutePosition.X + 10, button.AbsolutePosition.Y + 10, 0, false, game, 0)
+                        end)
+                    end
+                end
+                task.wait(0.05)
+            end
+        end)
+    end
+end)
+
+CreateToggle("Auto Reel (ดึงปลาอัตโนมัติ)", CONFIG.AutoReel, function(val)
+    CONFIG.AutoReel = val
+    if val then
+        task.spawn(function()
+            while CONFIG.AutoReel do
+                local reelUI = PlayerGui:FindFirstChild("reel") or PlayerGui:FindFirstChild("ReelUI")
+                if reelUI and reelUI.Enabled then
+                    local bar = reelUI:FindFirstChild("Bar", true)
+                    local target = reelUI:FindFirstChild("Fish", true)
+                    if bar and target then
+                        bar.Position = target.Position
+                    end
+                end
+                task.wait(0.05)
+            end
+        end)
+    end
+end)
+
+CreateToggle("Fishing Zone ESP (แสดงจุดตกปลา)", CONFIG.FishESP, function(val)
+    CONFIG.FishESP = val
+    local zones = workspace:FindFirstChild("zones") or workspace:FindFirstChild("FishingSpots")
+    if zones then
+        for _, zone in pairs(zones:GetChildren()) do
+            if zone:IsA("BasePart") then
+                local highlight = zone:FindFirstChild("ZoneESP")
+                if val and not highlight then
+                    highlight = Instance.new("Highlight")
+                    highlight.Name = "ZoneESP"
+                    highlight.FillColor = Color3.fromRGB(0, 170, 255)
+                    highlight.OutlineColor = Color3.fromRGB(255, 255, 255)
+                    highlight.Parent = zone
+                elseif not val and highlight then
+                    highlight:Destroy()
+                end
+            end
         end
     end
+end)
+
+-- // TOGGLE MENU VISIBILITY // --
+local function ToggleMenu()
+    MainFrame.Visible = not MainFrame.Visible
 end
 
-createToggleButton("Player ESP (Highlight)", false, function(active)
-    espEnabled = active
-    for _, player in ipairs(Players:GetPlayers()) do
-        updateHighlight(player)
-    end
-end)
+CloseBtn.MouseButton1Click:Connect(ToggleMenu)
+ToggleBtn.MouseButton1Click:Connect(ToggleMenu)
 
-Players.PlayerAdded:Connect(function(player)
-    player.CharacterAdded:Connect(function()
-        task.wait(1)
-        if espEnabled then updateHighlight(player) end
-    end)
-end)
-
-Players.PlayerRemoving:Connect(function(player)
-    if highlights[player] then
-        highlights[player]:Destroy()
-        highlights[player] = nil
-    end
-end)
-
--- 2. ระบบ Boost WalkSpeed (เพิ่มความเร็วเดิน)
-local speedEnabled = false
-local normalSpeed = 16
-local boostedSpeed = 24
-
-createToggleButton("Speed Boost (24 WS)", false, function(active)
-    speedEnabled = active
-    local char = LocalPlayer.Character
-    if char and char:FindFirstChild("Humanoid") then
-        char.Humanoid.WalkSpeed = active and boostedSpeed or normalSpeed
-    end
-end)
-
-LocalPlayer.CharacterAdded:Connect(function(char)
-    local humanoid = char:WaitForChild("Humanoid")
-    if speedEnabled then
-        humanoid.WalkSpeed = boostedSpeed
-    end
-end)
-
--- 3. ระบบ Fullbright (มองเห็นในที่มืดชัดเจน)
-local fullbrightEnabled = false
-local originalBrightness = Lighting.Brightness
-local originalClockTime = Lighting.ClockTime
-local originalFogEnd = Lighting.FogEnd
-
-createToggleButton("FullBright (Night Vision)", false, function(active)
-    fullbrightEnabled = active
-    if active then
-        Lighting.Brightness = 2
-        Lighting.ClockTime = 14
-        Lighting.FogEnd = 100000
-        Lighting.GlobalShadows = false
-    else
-        Lighting.Brightness = originalBrightness
-        Lighting.ClockTime = originalClockTime
-        Lighting.FogEnd = originalFogEnd
-        Lighting.GlobalShadows = true
-    end
-end)
-
--- ปุ่มลัด Toggle UI (กด RightControl เพื่อซ่อน/แสดง)
-local UserInputService = game:GetService("UserInputService")
 UserInputService.InputBegan:Connect(function(input, gameProcessed)
-    if not gameProcessed and input.KeyCode == Enum.KeyCode.RightControl then
-        MainFrame.Visible = not MainFrame.Visible
+    if not gameProcessed and input.KeyCode == CONFIG.ToggleKey then
+        ToggleMenu()
     end
 end)
-```
 
-สามารถนำสคริปต์นี้ไปใส่ใน **StarterPlayerScripts** หรือรันเพื่อทดสอบฟังก์ชันในแมพได้ทันที โดยสามารถกดปุ่ม **RightControl** บนคีย์บอร์ดเพื่อเปิด-ปิดหน้าต่างเมนูได้ตลอดเวลาครับ
+print("[Nexus Hub]: Fisch Script Loaded Successfully!")
