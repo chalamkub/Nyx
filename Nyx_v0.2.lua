@@ -1,87 +1,111 @@
--- โหลดไลบรารี Maclib UI 
-local Maclib = loadstring(game:HttpGet("https://raw.githubusercontent.com/biggaboy212/Maclib/main/maclib.lua"))()
+local UserInputService = game:GetService("UserInputService")
+local CoreGui = game:GetService("CoreGui")
 
--- 1. สร้างหน้าต่างหลัก (Window)
-local Window = Maclib:Window({
+-- โหลดไลบรารี
+local MacLib = loadstring(game:HttpGet("https://github.com/biggaboy212/Maclib/releases/latest/download/maclib.txt"))()
+
+-- 1. สร้างหน้าต่างหลัก
+local Window = MacLib:Window({
     Title = "NYX BLOX HUB",
-    Subtitle = "Script Interface",
-    Size = UDim2.fromOffset(868, 650),
+    Subtitle = "Blade Ball Interface",
+    Size = UDim2.fromOffset(600, 450), -- ปรับขนาดให้เล็กลงนิดหน่อยเพื่อให้พอดีกับจอมือถือ
     DragAndClose = false,
-    Color = Color3.fromRGB(138, 43, 226), -- สีม่วงสไตล์ Neon
-    LoadText = "Loading Interface..."
+    Color = Color3.fromRGB(57, 255, 20),
+    LoadText = "Loading NYX HUB..."
 })
 
--- 2. สร้างกลุ่มเมนูและ Tab ด้านซ้าย (Sidebar)
+-- 2. สร้างกลุ่ม Tab และหมวดหมู่
 local TabGroup = Window:TabGroup()
+local CombatTab = TabGroup:Tab({ Name = "Combat", Icon = "rbxassetid://10888331510" })
+local ParrySection = CombatTab:Section({ Name = "Auto Parry System" })
 
--- สร้าง Tab "Farming" และ "Loadout"
-local FarmTab = TabGroup:Tab({ Name = "Farming", Icon = "rbxassetid://10888331510" })
-local LoadoutTab = TabGroup:Tab({ Name = "Loadout", Icon = "rbxassetid://10888331510" })
-
--- 3. จัดกลุ่มเนื้อหาในหน้า Farming (Section)
-local MainFarmSection = FarmTab:Section({ Name = "Auto Farm" })
-local BossFarmSection = FarmTab:Section({ Name = "Bosses" })
-
--- 4. เพิ่มลูกเล่นต่างๆ (Elements) เข้าไปใน Section
-
--- Toggle เปิด/ปิด ฟาร์มปกติ
-MainFarmSection:Toggle({
-    Name = "Enabled",
-    Description = "Turn auto-farming on or off.",
+ParrySection:Toggle({
+    Name = "Enable Auto Parry",
+    Description = "Automatically blocks the ball when it targets you.",
     Default = false,
     Callback = function(state)
-        print("Auto Farm is now: ", state)
-        -- วางลูปโค้ด Auto Farm ตรงนี้
+        print("Auto Parry state: ", state)
     end
 })
 
--- Toggle ระบบใหม่ (WIP)
-MainFarmSection:Toggle({
-    Name = "Auto Final Selection [WIP]",
-    Description = "Travel to the Final Selection zone before its next cycle.",
-    Default = false,
-    Callback = function(state)
-        print("Auto Final Selection: ", state)
+ParrySection:Slider({
+    Name = "Parry Distance",
+    Description = "Adjust distance for parrying.",
+    Default = 15,
+    Minimum = 5,
+    Maximum = 50,
+    Callback = function(value)
+        print("Parry Distance: ", value)
     end
 })
 
--- Dropdown เลือกเควสแบบมี Description
-MainFarmSection:Dropdown({
-    Name = "Quest Selection",
-    Description = "Smart picks the best quest, or choose one.",
-    Multi = false,
-    Options = {"Smart", "Quest 1", "Quest 2", "Quest 3"},
-    Default = "Smart",
-    Callback = function(selected)
-        print("Selected Quest: ", selected)
-    end
-})
-
--- Toggle สำหรับหมวดหมู่บอส
-BossFarmSection:Toggle({
-    Name = "Enabled",
-    Description = "Turn boss farming on or off.",
-    Default = true,
-    Callback = function(state)
-        print("Boss Farming: ", state)
-    end
-})
-
--- Dropdown สำหรับเลือกบอส
-BossFarmSection:Dropdown({
-    Name = "Bosses",
-    Multi = false,
-    Options = {"[Lv 125] [Boss] [Saneri]", "[Lv 50] [Boss] [Rui]", "[Lv 200] [Boss] [Akaza]"},
-    Default = "[Lv 125] [Boss] [Saneri]",
-    Callback = function(selected)
-        print("Target Boss: ", selected)
-    end
-})
-
--- 5. สั่งให้ UI ทำงานและแสดงผล
-Maclib:SetFolder("NYX_Settings")
+-- 3. โหลด UI
+MacLib:SetFolder("NYX_BladeBall")
 Window:Notify({
-    Title = "Ready",
-    Description = "UI has been successfully loaded!",
+    Title = "Loaded",
+    Description = "Support PC & Mobile!",
     Lifetime = 3
 })
+
+-- ==========================================
+-- ระบบปุ่มลอยสำหรับมือถือ (Mobile Toggle)
+-- ==========================================
+
+-- เช็คว่าเป็นมือถือ (มีระบบ Touch และไม่มี Keyboard แบบ Hardware)
+if UserInputService.TouchEnabled and not UserInputService.KeyboardEnabled then
+    local ScreenGui = Instance.new("ScreenGui")
+    ScreenGui.Name = "NYX_MobileToggle"
+    -- พยายามใส่ใน CoreGui เพื่อป้องกันสคริปต์กันโปรของเกมลบ
+    local success = pcall(function() ScreenGui.Parent = CoreGui end)
+    if not success then ScreenGui.Parent = game.Players.LocalPlayer:WaitForChild("PlayerGui") end
+
+    -- สร้างปุ่มเปิด/ปิด
+    local ToggleBtn = Instance.new("TextButton")
+    ToggleBtn.Parent = ScreenGui
+    ToggleBtn.Size = UDim2.new(0, 50, 0, 50)
+    ToggleBtn.Position = UDim2.new(0.1, 0, 0.1, 0)
+    ToggleBtn.BackgroundColor3 = Color3.fromRGB(40, 40, 40)
+    ToggleBtn.Text = "NYX"
+    ToggleBtn.TextColor3 = Color3.fromRGB(57, 255, 20)
+    ToggleBtn.Font = Enum.Font.GothamBold
+    ToggleBtn.TextSize = 14
+    ToggleBtn.BorderSizePixel = 2
+    ToggleBtn.BorderColor3 = Color3.fromRGB(57, 255, 20)
+    
+    -- ทำให้ปุ่มเป็นวงกลม
+    local UICorner = Instance.new("UICorner")
+    UICorner.CornerRadius = UDim.new(1, 0)
+    UICorner.Parent = ToggleBtn
+
+    -- สคริปต์สำหรับกดเปิด/ปิด UI Maclib
+    -- หมายเหตุ: Maclib มักจะผูกปุ่ม RightControl ไว้ซ่อน UI เราจะจำลองการกด หรือสั่งผ่านฟังก์ชัน
+    ToggleBtn.MouseButton1Click:Connect(function()
+        -- สำหรับ Maclib ถ้าไม่มี API Toggle ให้ใช้ VirtualInput กดปุ่ม RightControl แทน
+        local vim = game:GetService("VirtualInputManager")
+        vim:SendKeyEvent(true, Enum.KeyCode.RightControl, false, game)
+        vim:SendKeyEvent(false, Enum.KeyCode.RightControl, false, game)
+    end)
+
+    -- สคริปต์ลากปุ่ม (Draggable)
+    local dragging, dragInput, dragStart, startPos
+    ToggleBtn.InputBegan:Connect(function(input)
+        if input.UserInputType == Enum.UserInputType.Touch or input.UserInputType == Enum.UserInputType.MouseButton1 then
+            dragging = true
+            dragStart = input.Position
+            startPos = ToggleBtn.Position
+        end
+    end)
+    ToggleBtn.InputEnded:Connect(function(input)
+        if input.UserInputType == Enum.UserInputType.Touch or input.UserInputType == Enum.UserInputType.MouseButton1 then
+            dragging = false
+        end
+    end)
+    UserInputService.InputChanged:Connect(function(input)
+        if input.UserInputType == Enum.UserInputType.Touch or input.UserInputType == Enum.UserInputType.MouseMovement then
+            if dragging then
+                local delta = input.Position - dragStart
+                ToggleBtn.Position = UDim2.new(startPos.X.Scale, startPos.X.Offset + delta.X, startPos.Y.Scale, startPos.Y.Offset + delta.Y)
+            end
+        end
+    end)
+end
