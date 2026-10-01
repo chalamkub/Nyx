@@ -24,7 +24,12 @@
 --   Window:Toggle()  Window:Destroy()  Window:SetTheme(n)  Window:SetAccent(c)  Window:SetScale(n)  Window:SetGlass(n)
 --
 -- Window buttons: red = close script (asks to confirm), yellow = 2 sizes, green = hide.
--- Built-in drawn icons: sprout, bag, arrow, shield, dumbbell, pin, gear, user, home, sword, search, list
+-- Built-in drawn icons: sprout, bag, arrow, shield, dumbbell, pin, gear, user, home, sword, search, list,
+--   sidebar, left, right, updown, lock, star, bolt, eye, folder
+-- Header: [sidebar toggle] [< back] [> forward] Title / Subtitle. Back/forward walk through the tabs you visited.
+--   Window:ToggleSidebar() collapses / expands the sidebar.
+-- Section icons: Tab:AddSection({ Title = "Bosses", Desc = "...", Icon = "star", IconColor = Color3.fromRGB(255, 82, 82) })
+--   Icon can be a built-in name, an image id, or an emoji (emoji keep their own colors).
 -- Icon values may also be an image id: "123" / "rbxassetid://123" / { Id = "123", Tint = false, Recolor = false }
 
 local Players = game:GetService("Players")
@@ -260,6 +265,51 @@ local IconDefs = {
 		a.line(4.2, 4.2, 11.8, 11.8, 1.2); a.line(11.8, 4.2, 4.2, 11.8, 1.2)
 	end,
 
+	sidebar = function(a)
+		a.outline(1.8, 3.0, 12.4, 10.0, 2.4, 1.2)
+		a.line(6.2, 3.6, 6.2, 12.4, 1.1)
+	end,
+
+	left = function(a)
+		a.line(10.2, 3.4, 5.4, 8.0, 1.3); a.line(5.4, 8.0, 10.2, 12.6, 1.3)
+	end,
+
+	right = function(a)
+		a.line(5.8, 3.4, 10.6, 8.0, 1.3); a.line(10.6, 8.0, 5.8, 12.6, 1.3)
+	end,
+
+	updown = function(a)
+		a.line(5.0, 6.4, 8.0, 3.6, 1.2); a.line(8.0, 3.6, 11.0, 6.4, 1.2)
+		a.line(5.0, 9.6, 8.0, 12.4, 1.2); a.line(8.0, 12.4, 11.0, 9.6, 1.2)
+	end,
+
+	lock = function(a)
+		a.outline(3.4, 7.0, 9.2, 6.8, 2.0, 1.2)
+		a.line(5.6, 7.0, 5.6, 4.8, 1.2); a.line(10.4, 7.0, 10.4, 4.8, 1.2)
+		a.line(5.6, 4.8, 6.6, 3.2, 1.2); a.line(6.6, 3.2, 9.4, 3.2, 1.2); a.line(9.4, 3.2, 10.4, 4.8, 1.2)
+		a.fill(7.3, 9.2, 1.4, 2.2, 0.7)
+	end,
+
+	star = function(a)
+		a.line(8, 1.8, 10, 6, 1.1); a.line(10, 6, 14.4, 6.5, 1.1); a.line(14.4, 6.5, 11.2, 9.5, 1.1)
+		a.line(11.2, 9.5, 12, 14, 1.1); a.line(12, 14, 8, 11.8, 1.1); a.line(8, 11.8, 4, 14, 1.1)
+		a.line(4, 14, 4.8, 9.5, 1.1); a.line(4.8, 9.5, 1.6, 6.5, 1.1); a.line(1.6, 6.5, 6, 6, 1.1); a.line(6, 6, 8, 1.8, 1.1)
+	end,
+
+	bolt = function(a)
+		a.line(9.2, 1.8, 4.4, 9.0, 1.15); a.line(4.4, 9.0, 8.0, 9.0, 1.15); a.line(8.0, 9.0, 6.8, 14.2, 1.15)
+		a.line(6.8, 14.2, 11.6, 7.0, 1.15); a.line(11.6, 7.0, 8.0, 7.0, 1.15); a.line(8.0, 7.0, 9.2, 1.8, 1.15)
+	end,
+
+	eye = function(a)
+		a.ring(1.4, 4.4, 13.2, 7.2, 3.6, 1.2); a.ring(6.0, 6.2, 4.0, 4.0, 2.0, 1.1)
+	end,
+
+	folder = function(a)
+		a.outline(2.0, 4.6, 12.0, 8.6, 2.0, 1.2)
+		a.line(3.0, 4.6, 3.0, 3.6, 1.1); a.line(3.0, 3.6, 6.2, 3.6, 1.1); a.line(6.2, 3.6, 7.4, 4.6, 1.1)
+	end,
+
 	list = function(a)
 		a.fill(2.0, 3.0, 2.0, 2.0, 0.8); a.fill(2.0, 7.0, 2.0, 2.0, 0.8); a.fill(2.0, 11.0, 2.0, 2.0, 0.8)
 		a.line(6.0, 4.0, 13.5, 4.0, 1.1); a.line(6.0, 8.0, 13.5, 8.0, 1.1); a.line(6.0, 12.0, 13.5, 12.0, 1.1)
@@ -270,6 +320,7 @@ local IconAlias = {
 	farming = "sprout", loadout = "bag", backpack = "bag", movement = "arrow", run = "arrow",
 	equip = "shield", training = "dumbbell", travel = "pin", map = "pin", settings = "gear",
 	character = "user", combat = "sword", swords = "sword",
+	locked = "lock", favorite = "star", power = "bolt", visual = "eye", esp = "eye", files = "folder",
 }
 
 local function resolveIconName(s)
@@ -627,7 +678,7 @@ function MacUI.CreateWindow(opts)
 
 	local sideList = New("ScrollingFrame", {
 		Position = UDim2.new(0, 0, 0, 45),
-		Size = UDim2.new(1, -1, 1, -45),
+		Size = UDim2.new(0, SIDE - 1, 1, -45),
 		BackgroundTransparency = 1,
 		BorderSizePixel = 0,
 		ScrollBarThickness = 0,
@@ -661,7 +712,7 @@ function MacUI.CreateWindow(opts)
 			Position = UDim2.fromOffset(dotX - 4, 9),
 			Size = UDim2.fromOffset(21, 26),
 			ZIndex = 10,
-			Parent = sideClip,
+			Parent = main,
 		})
 		local dot = New("Frame", {
 			AnchorPoint = Vector2.new(0.5, 0.5),
@@ -704,21 +755,96 @@ function MacUI.CreateWindow(opts)
 		BackgroundTransparency = 1,
 		Parent = main,
 	})
+	local noDrag = {} -- header controls that must not start a window drag
+	local history, histIdx = {}, 0
+	local navSelect, onToggleSidebar -- assigned further down
+	local headLeft = New("Frame", {
+		Name = "HeadLeft",
+		BackgroundTransparency = 1,
+		Position = UDim2.fromOffset(0, 0),
+		Size = UDim2.new(1, -170, 1, 0),
+		Parent = topbar,
+	})
+	local function navButton(x, key, iconName, onClick)
+		local hit = New("TextButton", {
+			Text = "",
+			AutoButtonColor = false,
+			BackgroundTransparency = 1,
+			Position = UDim2.fromOffset(x, 8),
+			Size = UDim2.fromOffset(22, 28),
+			Parent = headLeft,
+		})
+		local ic = uiIcon(hit, key, iconName, 16)
+		ic.Root.AnchorPoint = Vector2.new(0.5, 0.5)
+		ic.Root.Position = UDim2.fromScale(0.5, 0.5)
+		local enabled, hover = true, false
+		local function paint()
+			tintIcon(ic, (not enabled) and Theme.Off or (hover and Theme.Text or Theme.SubText))
+		end
+		table.insert(hooks, paint)
+		paint()
+		hit.MouseEnter:Connect(function()
+			hover = true
+			paint()
+		end)
+		hit.MouseLeave:Connect(function()
+			hover = false
+			paint()
+		end)
+		onPress(hit, function()
+			if enabled then
+				onClick()
+			end
+		end)
+		table.insert(noDrag, hit)
+		return {
+			SetEnabled = function(v)
+				enabled = v
+				paint()
+			end,
+		}
+	end
+	local backBtn, fwdBtn
+	local function updateNav()
+		backBtn.SetEnabled(histIdx > 1)
+		fwdBtn.SetEnabled(histIdx < #history)
+	end
+	navButton(14, "Sidebar", "sidebar", function()
+		if onToggleSidebar then
+			onToggleSidebar()
+		end
+	end)
+	backBtn = navButton(36, "Back", "left", function()
+		if histIdx > 1 then
+			histIdx -= 1
+			navSelect(history[histIdx], false, true)
+			updateNav()
+		end
+	end)
+	fwdBtn = navButton(57, "Forward", "right", function()
+		if histIdx < #history then
+			histIdx += 1
+			navSelect(history[histIdx], false, true)
+			updateNav()
+		end
+	end)
+	updateNav()
+
 	Label({
 		Text = opts.Title or "My Script",
 		Font = Enum.Font.GothamBold,
 		TextSize = 14,
-		Position = UDim2.fromOffset(16, 6),
-		Size = UDim2.new(1, -190, 0, 18),
+		Position = UDim2.fromOffset(88, 6),
+		Size = UDim2.new(1, -88, 0, 18),
 		TextTruncate = Enum.TextTruncate.AtEnd,
-		Parent = topbar,
+		Parent = headLeft,
 	}, "Text")
 	Label({
 		Text = opts.Subtitle or "Primary",
 		TextSize = 11,
-		Position = UDim2.fromOffset(16, 23),
-		Size = UDim2.new(1, -190, 0, 14),
-		Parent = topbar,
+		Position = UDim2.fromOffset(88, 23),
+		Size = UDim2.new(1, -88, 0, 14),
+		Parent = headLeft,
 	}, "SubText")
 
 	-- divider between the header (title / subtitle / search) and the content
@@ -739,6 +865,7 @@ function MacUI.CreateWindow(opts)
 		BorderSizePixel = 0,
 		Parent = topbar,
 	}, { Round(7) }), { BackgroundColor3 = "Field", BackgroundTransparency = "GlassField" })
+	table.insert(noDrag, searchFrame)
 	do
 		local si = uiIcon(searchFrame, "Search", "search", 14)
 		si.Root.AnchorPoint = Vector2.new(0, 0.5)
@@ -790,6 +917,18 @@ function MacUI.CreateWindow(opts)
 		BackgroundTransparency = 1,
 		Parent = main,
 	})
+	local sideOpen = true
+	local LIGHTS_W = 74 -- room for the traffic lights when the sidebar is collapsed
+	onToggleSidebar = function()
+		sideOpen = not sideOpen
+		local w = sideOpen and SIDE or 0
+		local lx = sideOpen and 0 or LIGHTS_W
+		tween(sideClip, { Size = UDim2.new(0, w, 1, 0) }, 0.2)
+		tween(topbar, { Position = UDim2.new(0, w, 0, 0), Size = UDim2.new(1, -w, 0, 44) }, 0.2)
+		tween(pages, { Position = UDim2.new(0, w, 0, 45), Size = UDim2.new(1, -w, 1, -45) }, 0.2)
+		tween(headLeft, { Position = UDim2.fromOffset(lx, 0), Size = UDim2.new(1, -170 - lx, 1, 0) }, 0.2)
+	end
+
 	local noResults = Label({
 		Text = "No results",
 		TextXAlignment = Enum.TextXAlignment.Center,
@@ -851,8 +990,13 @@ function MacUI.CreateWindow(opts)
 	local activeSlider = nil
 
 	local function overSearch(pos)
-		local a, sz = searchFrame.AbsolutePosition, searchFrame.AbsoluteSize
-		return pos.X >= a.X and pos.X <= a.X + sz.X and pos.Y >= a.Y and pos.Y <= a.Y + sz.Y
+		for _, f in ipairs(noDrag) do
+			local a, sz = f.AbsolutePosition, f.AbsoluteSize
+			if pos.X >= a.X and pos.X <= a.X + sz.X and pos.Y >= a.Y and pos.Y <= a.Y + sz.Y then
+				return true
+			end
+		end
+		return false
 	end
 	local function makeDraggable(handle)
 		handle.InputBegan:Connect(function(input)
@@ -1034,7 +1178,7 @@ function MacUI.CreateWindow(opts)
 		end
 		noResults.Visible = false
 		if q ~= "" and currentTab and not currentTab.HasMatch and firstMatch then
-			Window._select(firstMatch, true)
+			Window._select(firstMatch, true, true)
 		elseif currentTab then
 			currentTab.Page.Visible = true
 		end
@@ -1056,8 +1200,16 @@ function MacUI.CreateWindow(opts)
 		end
 	end
 
-	local function selectTab(tab, skipFilter)
+	local function selectTab(tab, skipFilter, noHistory)
 		local old = currentTab
+		if not noHistory and old ~= tab then
+			for i = #history, histIdx + 1, -1 do
+				history[i] = nil
+			end
+			table.insert(history, tab)
+			histIdx = #history
+			updateNav()
+		end
 		currentTab = tab
 		if old and old ~= tab then
 			old.Page.Visible = false
@@ -1072,6 +1224,7 @@ function MacUI.CreateWindow(opts)
 		end
 	end
 	Window._select = selectTab
+	navSelect = selectTab
 
 	local function makeSection(tab, o)
 		o = o or {}
@@ -1088,7 +1241,32 @@ function MacUI.CreateWindow(opts)
 		local secEntry = { Holder = holder, Rows = {} }
 		table.insert(tab._sections, secEntry)
 
-		if o.Title then
+		if o.Title and o.Icon then
+			local head = New("Frame", {
+				BackgroundTransparency = 1,
+				AutomaticSize = Enum.AutomaticSize.Y,
+				Size = UDim2.new(1, 0, 0, 18),
+				LayoutOrder = 1,
+				Parent = holder,
+			})
+			local sic = makeIcon(head, o.Icon, 16)
+			sic.Root.AnchorPoint = Vector2.new(0, 0.5)
+			sic.Root.Position = UDim2.fromOffset(0, 9)
+			if o.IconColor then
+				tintIcon(sic, o.IconColor)
+			else
+				themedIcon(sic, "Accent")
+			end
+			Label({
+				Text = o.Title,
+				Font = Enum.Font.GothamBold,
+				AutomaticSize = Enum.AutomaticSize.Y,
+				Position = UDim2.fromOffset(24, 0),
+				Size = UDim2.new(1, -24, 0, 18),
+				TextWrapped = true,
+				Parent = head,
+			}, "Text")
+		elseif o.Title then
 			Label({
 				Text = o.Title,
 				Font = Enum.Font.GothamBold,
@@ -1235,7 +1413,7 @@ function MacUI.CreateWindow(opts)
 				Size = UDim2.new(1, -30, 1, 0),
 				Parent = btn,
 			}, "Text")
-			local chev = uiIcon(btn, "Chevron", "chevron", 14)
+			local chev = uiIcon(btn, "Chevron", "updown", 14)
 			chev.Root.AnchorPoint = Vector2.new(1, 0.5)
 			chev.Root.Position = UDim2.new(1, -6, 0.5, 0)
 			themedIcon(chev, "SubText")
@@ -1735,6 +1913,9 @@ function MacUI.CreateWindow(opts)
 	end
 	function Window:Toggle()
 		toggleMain()
+	end
+	function Window:ToggleSidebar()
+		onToggleSidebar()
 	end
 
 	onPress(red, function()
