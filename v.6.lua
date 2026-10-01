@@ -1329,7 +1329,7 @@ function MacUI.CreateWindow(opts)
 		local tab = Window:AddTab({
 			Section = o.Section or "Settings",
 			Name = o.Name or "Settings",
-			Icon = o.Icon or "gear",
+			Icon = o.Icon or "119830582088398",
 		})
 
 		local look = tab:AddSection({ Title = "Appearance", Desc = "Change the UI color tone." })
