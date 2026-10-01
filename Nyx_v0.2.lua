@@ -103,57 +103,59 @@ end
 ----------------------------------------------------------------------
 local IconDefs = {
 	home = function(a)
-		a.line(2, 7.5, 8, 2.2, 1.7); a.line(8, 2.2, 14, 7.5, 1.7)
-		a.line(3.2, 7, 3.2, 13.8, 1.6); a.line(12.8, 7, 12.8, 13.8, 1.6)
-		a.line(3.2, 13.8, 12.8, 13.8, 1.6); a.line(6.4, 13.5, 6.4, 9.5, 1.5); a.line(9.6, 13.5, 9.6, 9.5, 1.5)
+		a.line(2.2, 7.2, 8, 2.2, 1.55); a.line(8, 2.2, 13.8, 7.2, 1.55)
+		a.line(3.4, 6.6, 3.4, 13.8, 1.55); a.line(12.6, 6.6, 12.6, 13.8, 1.55)
+		a.line(3.4, 13.8, 12.6, 13.8, 1.55)
+		a.line(6.5, 13.8, 6.5, 9.5, 1.4); a.line(6.5, 9.5, 9.5, 9.5, 1.4); a.line(9.5, 9.5, 9.5, 13.8, 1.4)
 	end,
 	sprout = function(a)
-		a.line(8, 14.5, 8, 7.5, 1.5)
-		a.ring(2.2, 2.4, 5.7, 4.2, 2.4, 1.4); a.ring(8.1, 1.8, 5.7, 4.2, 2.4, 1.4)
-		a.line(8, 8, 5.3, 5.8, 1.3); a.line(8, 8, 10.7, 5.2, 1.3)
+		a.line(8, 14, 8, 7.5, 1.45)
+		a.line(8, 8.2, 5.1, 5.4, 1.35); a.line(8, 7.2, 10.9, 4.6, 1.35)
+		a.ring(2.4, 2.8, 5.2, 3.8, 2.2, 1.35); a.ring(8.5, 2.1, 5.2, 3.8, 2.2, 1.35)
 	end,
 	bag = function(a)
-		a.line(4, 6, 4, 13.5, 1.6); a.line(12, 6, 12, 13.5, 1.6)
-		a.line(4, 13.5, 12, 13.5, 1.6); a.line(4, 6, 12, 6, 1.6)
-		a.ring(5.2, 2, 5.6, 6, 2.8, 1.5)
+		a.line(4, 6, 4, 13.5, 1.55); a.line(12, 6, 12, 13.5, 1.55)
+		a.line(4, 13.5, 12, 13.5, 1.55); a.line(4, 6, 12, 6, 1.55)
+		a.line(5.2, 6, 5.2, 4.1, 1.4); a.line(10.8, 6, 10.8, 4.1, 1.4); a.line(5.2, 4.1, 10.8, 4.1, 1.4)
 	end,
 	arrow = function(a)
-		a.line(3, 8, 13, 8, 1.7); a.line(9, 4, 13, 8, 1.7); a.line(9, 12, 13, 8, 1.7); a.line(3, 4, 3, 12, 1.5)
+		a.line(2.5, 8, 13.2, 8, 1.65); a.line(9, 4, 13, 8, 1.65); a.line(9, 12, 13, 8, 1.65); a.line(3.2, 4.3, 3.2, 11.7, 1.45)
 	end,
 	shield = function(a)
-		a.line(8, 1.8, 13.2, 4.1, 1.5); a.line(13.2, 4.1, 12.2, 10.5, 1.5)
-		a.line(12.2, 10.5, 8, 14.2, 1.5); a.line(8, 14.2, 3.8, 10.5, 1.5)
-		a.line(3.8, 10.5, 2.8, 4.1, 1.5); a.line(2.8, 4.1, 8, 1.8, 1.5)
-		a.line(5.4, 8, 7.1, 9.7, 1.5); a.line(7.1, 9.7, 10.7, 6, 1.5)
+		a.line(8, 1.8, 13, 4.1, 1.5); a.line(13, 4.1, 12, 10.5, 1.5); a.line(12, 10.5, 8, 14.2, 1.5)
+		a.line(8, 14.2, 4, 10.5, 1.5); a.line(4, 10.5, 3, 4.1, 1.5); a.line(3, 4.1, 8, 1.8, 1.5)
+		a.line(5.2, 8.1, 7.2, 10, 1.4); a.line(7.2, 10, 10.9, 6.1, 1.4)
 	end,
 	dumbbell = function(a)
-		a.line(4.2, 8, 11.8, 8, 1.7); a.line(2.2, 5, 2.2, 11, 1.7); a.line(4.2, 4, 4.2, 12, 1.7)
-		a.line(11.8, 4, 11.8, 12, 1.7); a.line(13.8, 5, 13.8, 11, 1.7)
+		a.line(4.2, 8, 11.8, 8, 1.6); a.line(2.2, 5, 2.2, 11, 1.65); a.line(4.3, 4, 4.3, 12, 1.65)
+		a.line(11.7, 4, 11.7, 12, 1.65); a.line(13.8, 5, 13.8, 11, 1.65)
 	end,
 	pin = function(a)
-		a.ring(4, 1.8, 8, 8, 4, 1.6); a.line(5, 8, 8, 14, 1.6); a.line(11, 8, 8, 14, 1.6); a.fill(7.2, 4.8, 1.6, 1.6, 0.8)
+		a.ring(3.1, 1.6, 9.8, 9.8, 4.9, 1.55); a.line(5.2, 9.1, 8, 14.2, 1.55); a.line(10.8, 9.1, 8, 14.2, 1.55); a.fill(7.1, 5.6, 1.8, 1.8, 0.9)
 	end,
 	gear = function(a)
-		a.ring(3.8, 3.8, 8.4, 8.4, 4.2, 1.8); a.ring(6.4, 6.4, 3.2, 3.2, 1.6, 1.5)
-		a.line(8, 0.8, 8, 3, 1.7); a.line(8, 13, 8, 15.2, 1.7); a.line(0.8, 8, 3, 8, 1.7); a.line(13, 8, 15.2, 8, 1.7)
+		a.ring(3.5, 3.5, 9, 9, 4.5, 1.7); a.ring(6.3, 6.3, 3.4, 3.4, 1.7, 1.45)
+		a.line(8, 0.8, 8, 3, 1.65); a.line(8, 13, 8, 15.2, 1.65); a.line(0.8, 8, 3, 8, 1.65); a.line(13, 8, 15.2, 8, 1.65)
+		a.line(2.2, 2.2, 3.8, 3.8, 1.55); a.line(12.2, 12.2, 13.8, 13.8, 1.55); a.line(12.2, 3.8, 13.8, 2.2, 1.55); a.line(2.2, 13.8, 3.8, 12.2, 1.55)
 	end,
 	user = function(a)
-		a.ring(5, 1.7, 6, 6, 3, 1.6); a.ring(2.5, 9, 11, 6, 5.5, 1.6)
+		a.ring(5, 1.7, 6, 6, 3, 1.55); a.ring(2.5, 9.2, 11, 6.2, 5.2, 1.55)
 	end,
 	sword = function(a)
-		a.line(3, 13, 12.8, 3.2, 1.8); a.line(2.5, 10.2, 5.8, 13.5, 1.6); a.line(10.7, 5.3, 13.2, 2.8, 1.5)
+		a.line(3, 13, 12.7, 3.3, 1.7); a.line(2.6, 10.2, 5.8, 13.4, 1.55); a.line(10.7, 5.3, 13.2, 2.8, 1.45)
 	end,
 	search = function(a)
-		a.ring(1.8, 1.8, 9, 9, 4.5, 1.7); a.line(9.8, 9.8, 14.2, 14.2, 1.8)
+		a.ring(1.8, 1.8, 8.8, 8.8, 4.4, 1.6); a.line(9.6, 9.6, 13.9, 13.9, 1.7)
 	end,
 	chevron = function(a)
-		a.line(3.5, 6, 8, 10.5, 1.7); a.line(8, 10.5, 12.5, 6, 1.7)
+		a.line(4, 5.8, 8, 10, 1.55); a.line(8, 10, 12, 5.8, 1.55)
 	end,
 	list = function(a)
-		a.ring(2, 3.2, 2, 2, 1, 1.3); a.ring(2, 7, 2, 2, 1, 1.3); a.ring(2, 10.8, 2, 2, 1, 1.3)
-		a.line(6, 4.2, 13.5, 4.2, 1.5); a.line(6, 8, 13.5, 8, 1.5); a.line(6, 11.8, 13.5, 11.8, 1.5)
+		a.fill(2.2, 3.2, 2, 2, 0.8); a.fill(2.2, 7, 2, 2, 0.8); a.fill(2.2, 10.8, 2, 2, 0.8)
+		a.line(6, 4.2, 13.5, 4.2, 1.45); a.line(6, 8, 13.5, 8, 1.45); a.line(6, 11.8, 13.5, 11.8, 1.45)
 	end,
 }
+
 local IconAlias = {
 	farming = "sprout", loadout = "bag", backpack = "bag", movement = "arrow", run = "arrow",
 	equip = "shield", training = "dumbbell", travel = "pin", map = "pin", settings = "gear",
@@ -459,7 +461,7 @@ function MacUI.CreateWindow(opts)
 		Font = Enum.Font.GothamBold,
 		TextSize = 14,
 		Position = UDim2.fromOffset(textX, 6),
-		Size = UDim2.new(1, -textX - 170, 0, 18),
+		Size = UDim2.new(1, -textX - 178, 0, 18),
 		TextTruncate = Enum.TextTruncate.AtEnd,
 		Parent = topbar,
 	}, "Text")
@@ -467,7 +469,7 @@ function MacUI.CreateWindow(opts)
 		Text = opts.Subtitle or "Primary",
 		TextSize = 11,
 		Position = UDim2.fromOffset(textX, 23),
-		Size = UDim2.new(1, -textX - 170, 0, 14),
+		Size = UDim2.new(1, -textX - 178, 0, 14),
 		Parent = topbar,
 	}, "SubText")
 
@@ -481,16 +483,30 @@ function MacUI.CreateWindow(opts)
 		TextYAlignment = Enum.TextYAlignment.Center,
 		AnchorPoint = Vector2.new(1, 0.5),
 		Position = UDim2.new(1, -12, 0.5, 0),
-		Size = UDim2.fromOffset(150, 26),
+		Size = UDim2.fromOffset(150, 28),
 		BorderSizePixel = 0,
 		Parent = topbar,
-	}, { Round(7), New("UIPadding", { PaddingLeft = UDim.new(0, 30), PaddingRight = UDim.new(0, 10) }) }), {
+	}, {
+		Round(7),
+		New("UIPadding", {
+			PaddingLeft = UDim.new(0, 31),
+			PaddingRight = UDim.new(0, 9),
+			PaddingTop = UDim.new(0, 0),
+			PaddingBottom = UDim.new(0, 0),
+		})
+	}), {
 		BackgroundColor3 = "Field", TextColor3 = "Text", PlaceholderColor3 = "SubText",
 	})
-	searchBox.BackgroundTransparency = GLASS_FIELD
 	do
-		local si = buildIcon("search", searchBox, 14)
-		si.Root.Position = UDim2.fromOffset(8, 6)
+		local iconHolder = New("Frame", {
+			BackgroundTransparency = 1,
+			AnchorPoint = Vector2.new(0, 0.5),
+			Position = UDim2.new(0, 10, 0.5, 0),
+			Size = UDim2.fromOffset(15, 15),
+			Parent = searchBox,
+		})
+		local si = buildIcon("search", iconHolder, 15)
+		si.Root.Position = UDim2.fromOffset(0, 0)
 		themedIcon(si, "SubText")
 	end
 
