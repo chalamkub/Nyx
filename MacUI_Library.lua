@@ -26,7 +26,8 @@
 -- Window buttons: red = close script (asks to confirm), yellow = 2 sizes, green = hide.
 -- Built-in drawn icons: sprout, bag, arrow, shield, dumbbell, pin, gear, user, home, sword, search, list,
 --   sidebar, left, right, updown, lock, star, bolt, eye, folder
--- Header: [sidebar toggle] [< back] [> forward] Title / Subtitle. Back/forward walk through the tabs you visited.
+-- Header: [sidebar toggle] [< back] [> forward] Title / Subtitle. (< > use built-in image ids; override with Icons = { Back = "id", Forward = "id" })
+--   Back/forward walk through the tabs you visited.
 --   Window:ToggleSidebar() collapses / expands the sidebar.
 -- Section icons: Tab:AddSection({ Title = "Bosses", Desc = "...", Icon = "star", IconColor = Color3.fromRGB(255, 82, 82) })
 --   Icon can be a built-in name, an image id, or an emoji (emoji keep their own colors).
@@ -173,8 +174,14 @@ local function getIconTexture(name)
 end
 
 -- returns the configured texture for `name`, otherwise `fallback`
+-- built-in image ids for the header icons (override with Icons = { Back = "id", Forward = "id" })
+local DefaultUiIcons = {
+	back = "96033474959771",     -- chevron-left
+	forward = "73855156790773",  -- chevron-right
+}
+
 local function getConfiguredIcon(name, fallback)
-	return getIconTexture(name) or fallback
+	return getIconTexture(name) or DefaultUiIcons[string.lower(name)] or fallback
 end
 
 local function isAssetLike(x)
@@ -777,9 +784,28 @@ function MacUI.CreateWindow(opts)
 		local ic = uiIcon(hit, key, iconName, 16)
 		ic.Root.AnchorPoint = Vector2.new(0.5, 0.5)
 		ic.Root.Position = UDim2.fromScale(0.5, 0.5)
+		-- if an image id cannot load (wrong id / not an Image asset), fall back to the drawn icon
+		local fb
+		if ic.Kind == "image" then
+			fb = makeIcon(hit, iconName, 16)
+			fb.Root.AnchorPoint = Vector2.new(0.5, 0.5)
+			fb.Root.Position = UDim2.fromScale(0.5, 0.5)
+			fb.Root.Visible = false
+			task.delay(5, function()
+				if ic.Root.Parent and not ic.Root.IsLoaded then
+					ic.Root.Visible = false
+					fb.Root.Visible = true
+					warn("[MacUI] Header icon '" .. tostring(key) .. "' did not load. Use an Image asset id (not a Decal id).")
+				end
+			end)
+		end
 		local enabled, hover = true, false
 		local function paint()
-			tintIcon(ic, (not enabled) and Theme.Off or (hover and Theme.Text or Theme.SubText))
+			local c = (not enabled) and Theme.Off or (hover and Theme.Text or Theme.SubText)
+			tintIcon(ic, c)
+			if fb then
+				tintIcon(fb, c)
+			end
 		end
 		table.insert(hooks, paint)
 		paint()
