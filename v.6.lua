@@ -106,7 +106,7 @@ end
 ----------------------------------------------------------------------
 local IconTextures = {
 	Farming  = nil, -- "123456789"
-	Loadout  = "119764640250310", -- "123456789"
+	Loadout  = "119764640250310", Tint = false, -- "123456789"
 	Movement = nil, -- "123456789"
 	Equip    = nil, -- "123456789"
 	Training = nil, -- "123456789"
@@ -299,17 +299,26 @@ end
 local function makeIcon(parent, icon, size)
 	size = size or 16
 
-	-- icon can be: texture id, URL, or built-in icon name
+	local name = resolveIconName(icon)
+
+	if name then
+		return buildIcon(name, parent, size)
+	end
+
 	local img = normalizeAsset(icon)
+
 	if img and (string.find(img, "rbxasset") or string.find(img, "http")) then
 		local image = New("ImageLabel", {
 			Name = "Icon",
 			BackgroundTransparency = 1,
 			Image = img,
-			ImageColor3 = Color3.fromRGB(255, 255, 255),
-			ImageTransparency = 0,
-			ScaleType = Enum.ScaleType.Fit,
+
+			-- สีเริ่มต้น
+			ImageColor3 = Color3.fromRGB(150, 157, 171),
+
 			Size = UDim2.fromOffset(size, size),
+			ScaleType = Enum.ScaleType.Fit,
+
 			Parent = parent,
 		})
 
@@ -318,6 +327,19 @@ local function makeIcon(parent, icon, size)
 			Root = image,
 		}
 	end
+
+	return {
+		Kind = "text",
+		Root = New("TextLabel", {
+			BackgroundTransparency = 1,
+			Text = icon or "",
+			Font = Enum.Font.Gotham,
+			TextSize = size - 2,
+			Size = UDim2.fromOffset(size, size),
+			Parent = parent,
+		}),
+	}
+end
 
 	-- built-in fallback
 	local name = type(icon) == "string" and resolveIconName(icon) or nil
@@ -340,11 +362,12 @@ local function makeIcon(parent, icon, size)
 end
 
 local function tintIcon(ic, color)
-	if not ic or not ic.Root then
+	if not ic then
 		return
 	end
 
 	if ic.Kind == "drawn" then
+
 		for _, p in ipairs(ic.Parts) do
 			if p.Kind == "fill" then
 				p.Inst.BackgroundColor3 = color
@@ -352,10 +375,13 @@ local function tintIcon(ic, color)
 				p.Inst.Color = color
 			end
 		end
+
 	elseif ic.Kind == "image" then
-		-- Texture ID is automatically recolored to the current UI theme color.
+
 		ic.Root.ImageColor3 = color
+
 	elseif ic.Kind == "text" then
+
 		ic.Root.TextColor3 = color
 	end
 end
@@ -1504,7 +1530,7 @@ end
 ------------------------------------------------------------------
 local Window = MacUI.CreateWindow({
 	Title = "Nyx Hub",
-	Subtitle = "version 1.5",
+	Subtitle = "version 1.6.5",
     Logo = "rbxassetid://134813417493601",
 	-- Put your logo id INSIDE this table, between the braces, with a comma at the end:
 	-- Theme = "Dark",
