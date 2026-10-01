@@ -6,8 +6,7 @@
 --   B) Local:   save MacUI.lua into your executor's workspace folder (same name) and leave
 --               LIB_URL empty. The demo will use readfile("MacUI.lua").
 
-local LIB_URL = "" -- e.g. "https://raw.githubusercontent.com/USER/REPO/main/MacUI.lua"
-local LIB_FILE = "MacUI.lua"
+local LIB_URL = "" -- e.g. "https://raw.githubusercontent.com/chalamkub/Nyx/refs/heads/main/MacUI_Library.lua"
 
 local function loadLibrary()
 	local src
