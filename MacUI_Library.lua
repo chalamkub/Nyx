@@ -278,11 +278,11 @@ local IconDefs = {
 	end,
 
 	left = function(a)
-		a.line(10.2, 3.4, 5.4, 8.0, 1.3); a.line(5.4, 8.0, 10.2, 12.6, 1.3)
+		a.line(10.2, 3.4, 5.4, 8.0, 1.6); a.line(5.4, 8.0, 10.2, 12.6, 1.6)
 	end,
 
 	right = function(a)
-		a.line(5.8, 3.4, 10.6, 8.0, 1.3); a.line(10.6, 8.0, 5.8, 12.6, 1.3)
+		a.line(5.8, 3.4, 10.6, 8.0, 1.6); a.line(10.6, 8.0, 5.8, 12.6, 1.6)
 	end,
 
 	updown = function(a)
@@ -781,13 +781,13 @@ function MacUI.CreateWindow(opts)
 			Size = UDim2.fromOffset(22, 28),
 			Parent = headLeft,
 		})
-		local ic = uiIcon(hit, key, iconName, 16)
+		local ic = uiIcon(hit, key, iconName, 18)
 		ic.Root.AnchorPoint = Vector2.new(0.5, 0.5)
 		ic.Root.Position = UDim2.fromScale(0.5, 0.5)
 		-- if an image id cannot load (wrong id / not an Image asset), fall back to the drawn icon
 		local fb
 		if ic.Kind == "image" then
-			fb = makeIcon(hit, iconName, 16)
+			fb = makeIcon(hit, iconName, 18)
 			fb.Root.AnchorPoint = Vector2.new(0.5, 0.5)
 			fb.Root.Position = UDim2.fromScale(0.5, 0.5)
 			fb.Root.Visible = false
@@ -801,7 +801,7 @@ function MacUI.CreateWindow(opts)
 		end
 		local enabled, hover = true, false
 		local function paint()
-			local c = (not enabled) and Theme.Off or (hover and Theme.Text or Theme.SubText)
+			local c = (not enabled) and Theme.Off:Lerp(Theme.SubText, 0.5) or (hover and Theme.Accent or Theme.Text)
 			tintIcon(ic, c)
 			if fb then
 				tintIcon(fb, c)
@@ -1006,8 +1006,12 @@ function MacUI.CreateWindow(opts)
 		end)
 	end
 
+	local refreshCurrent -- assigned after selectTab exists
 	local function toggleMain()
 		main.Visible = not main.Visible
+		if main.Visible and refreshCurrent then
+			refreshCurrent()
+		end
 	end
 
 	-- dragging (window, open button, sliders)
@@ -1218,7 +1222,7 @@ function MacUI.CreateWindow(opts)
 		tab.Text.TextColor3 = c
 		tab.Bar.Visible = selected
 		if tab.Icon and not tab.NoTint then
-			tintIcon(tab.Icon, c)
+			tintIcon(tab.Icon, selected and c or Theme.SubText:Lerp(Theme.Text, 0.4))
 		end
 		-- untinted image icons: dim them when the tab is not selected
 		if tab.Icon and tab.Icon.Kind == "image" and (tab.NoTint or tab.Icon.Tint == false) then
@@ -1251,6 +1255,29 @@ function MacUI.CreateWindow(opts)
 	end
 	Window._select = selectTab
 	navSelect = selectTab
+
+	-- Re-applies the current tab once the layout has settled (same effect as clicking another tab and
+	-- coming back), so the first tab is usable right when the window opens. Calls are batched.
+	local refreshToken = 0
+	refreshCurrent = function()
+		refreshToken += 1
+		local my = refreshToken
+		task.defer(function()
+			if my ~= refreshToken or not gui.Parent or not currentTab then
+				return
+			end
+			currentTab.Page.Visible = false
+			task.wait()
+			if my ~= refreshToken or not gui.Parent or not currentTab then
+				return
+			end
+			selectTab(currentTab, false, true)
+			task.wait(0.25)
+			if my == refreshToken and gui.Parent and currentTab then
+				selectTab(currentTab, false, true)
+			end
+		end)
+	end
 
 	local function makeSection(tab, o)
 		o = o or {}
@@ -1327,6 +1354,7 @@ function MacUI.CreateWindow(opts)
 
 		local function newRow(title, desc)
 			Section._count += 1
+			refreshCurrent()
 			local hasDesc = desc ~= nil and desc ~= ""
 			local row = New("Frame", {
 				Name = title or "Row",
@@ -1774,6 +1802,7 @@ function MacUI.CreateWindow(opts)
 		else
 			styleTab(Tab)
 		end
+		refreshCurrent()
 		return Tab
 	end
 
