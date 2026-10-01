@@ -27,7 +27,7 @@
 -- Built-in drawn icons: sprout, bag, arrow, shield, dumbbell, pin, gear, user, home, sword, search, list,
 --   sidebar, left, right, updown, lock, star, bolt, eye, folder
 -- Header: [sidebar toggle] [< back] [> forward] Title / Subtitle. (< > use built-in image ids; override with Icons = { Back = "id", Forward = "id" })
---   < and > are always both shown: previous / next tab, wrapping around at the first / last tab.
+--   < and > go to the previous / next tab: both show on middle tabs, only > on the first tab, only < on the last tab.
 --   Window:ToggleSidebar() collapses / expands the sidebar.
 -- Profile (bottom of the sidebar): avatar + name of the local player. Options in CreateWindow:
 --   ShowUser = true, UserName = "text", UserId = 123, UserImage = "rbxassetid://...", MaskName = false (true -> "iM*****")
@@ -930,6 +930,8 @@ function MacUI.CreateWindow(opts)
 			navStep(1)
 		end
 	end)
+	backBtn.SetVisible(false)
+	fwdBtn.SetVisible(false)
 
 	Label({
 		Text = opts.Title or "My Script",
@@ -1324,8 +1326,8 @@ function MacUI.CreateWindow(opts)
 	end
 	Window._select = selectTab
 
-	-- < / > : previous / next visible tab. Both arrows are always shown and wrap around
-	-- (< on the first tab goes to the last tab, > on the last tab goes to the first tab).
+	-- < / > : previous / next visible tab, one step per press.
+	-- Middle tabs show both arrows; the first tab shows only > and the last tab shows only <.
 	local function navList()
 		local list = {}
 		for _, t in ipairs(tabsList) do
@@ -1346,15 +1348,14 @@ function MacUI.CreateWindow(opts)
 	updateNav = function()
 		local list = navList()
 		local i = navIndex(list)
-		local usable = (i ~= nil and #list > 1)
-		backBtn.SetEnabled(usable)
-		fwdBtn.SetEnabled(usable)
+		backBtn.SetVisible(i ~= nil and i > 1)
+		fwdBtn.SetVisible(i ~= nil and i < #list)
 	end
 	navStep = function(dir)
 		local list = navList()
 		local i = navIndex(list)
-		if i and #list > 1 then
-			selectTab(list[(i - 1 + dir) % #list + 1])
+		if i and list[i + dir] then
+			selectTab(list[i + dir])
 		end
 	end
 
