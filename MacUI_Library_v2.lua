@@ -43,6 +43,23 @@ local AssetService = game:GetService("AssetService")
 
 local MacUI = {}
 
+-- Compatibility helpers: accept common naming styles without changing the UI.
+-- Priority is always Name -> Title -> Text -> ButtonText -> fallback.
+local function optionName(options, fallback)
+	if type(options) == "string" then
+		return options
+	end
+	options = options or {}
+	return options.Name or options.Title or options.Text or options.ButtonText or fallback
+end
+
+local function normalizeOptions(options, fallback)
+	if type(options) ~= "table" then
+		return { Name = tostring(options or fallback) }
+	end
+	return options
+end
+
 local Presets = {
 	Dark = {
 		Window = Color3.fromRGB(30, 33, 40), Sidebar = Color3.fromRGB(37, 41, 50),
@@ -1383,7 +1400,8 @@ function MacUI.CreateWindow(opts)
 	end
 
 	local function makeSection(tab, o)
-		o = o or {}
+		o = normalizeOptions(o, "Section")
+		local sectionTitle = optionName(o, nil)
 		local Section = { _count = 0 }
 		tab._order += 1
 
@@ -1397,7 +1415,7 @@ function MacUI.CreateWindow(opts)
 		local secEntry = { Holder = holder, Rows = {} }
 		table.insert(tab._sections, secEntry)
 
-		if o.Title and o.Icon then
+		if sectionTitle and o.Icon then
 			local head = New("Frame", {
 				BackgroundTransparency = 1,
 				AutomaticSize = Enum.AutomaticSize.Y,
@@ -1414,7 +1432,7 @@ function MacUI.CreateWindow(opts)
 				themedIcon(sic, "Accent")
 			end
 			Label({
-				Text = o.Title,
+				Text = sectionTitle,
 				Font = Enum.Font.GothamBold,
 				AutomaticSize = Enum.AutomaticSize.Y,
 				Position = UDim2.fromOffset(24, 0),
@@ -1422,9 +1440,9 @@ function MacUI.CreateWindow(opts)
 				TextWrapped = true,
 				Parent = head,
 			}, "Text")
-		elseif o.Title then
+		elseif sectionTitle then
 			Label({
-				Text = o.Title,
+				Text = sectionTitle,
 				Font = Enum.Font.GothamBold,
 				AutomaticSize = Enum.AutomaticSize.Y,
 				Size = UDim2.new(1, 0, 0, 0),
@@ -1503,7 +1521,9 @@ function MacUI.CreateWindow(opts)
 		end
 
 		function Section:AddToggle(t)
-			local row = newRow(t.Name, t.Desc)
+			t = normalizeOptions(t, "Toggle")
+			local title = optionName(t, "Toggle")
+			local row = newRow(title, t.Desc)
 			local state = t.Default == true
 			local track = New("TextButton", {
 				Text = "",
@@ -1549,7 +1569,9 @@ function MacUI.CreateWindow(opts)
 		end
 
 		function Section:AddDropdown(d)
-			local row = newRow(d.Name, d.Desc)
+			d = normalizeOptions(d, "Dropdown")
+			local title = optionName(d, "Dropdown")
+			local row = newRow(title, d.Desc)
 			local options = d.Options or {}
 			local value = d.Default or options[1]
 
@@ -1664,7 +1686,9 @@ function MacUI.CreateWindow(opts)
 		end
 
 		function Section:AddSlider(s)
-			local row = newRow(s.Name, s.Desc)
+			s = normalizeOptions(s, "Slider")
+			local title = optionName(s, "Slider")
+			local row = newRow(title, s.Desc)
 			local min, max, inc = s.Min or 0, s.Max or 100, s.Increment or 1
 			local value = math.clamp(s.Default or min, min, max)
 
@@ -1738,9 +1762,11 @@ function MacUI.CreateWindow(opts)
 		end
 
 		function Section:AddButton(b)
-			local row = newRow(b.Name, b.Desc)
+			b = normalizeOptions(b, "Button")
+			local title = optionName(b, "Button")
+			local row = newRow(title, b.Desc)
 			local btn = themed(New("TextButton", {
-				Text = b.ButtonText or "Run",
+				Text = b.ButtonText or b.Name or b.Title or b.Text or "Run",
 				Font = Enum.Font.GothamMedium,
 				TextSize = 13,
 				AutoButtonColor = false,
@@ -1771,7 +1797,9 @@ function MacUI.CreateWindow(opts)
 		end
 
 		function Section:AddLabel(l)
-			local row, descLabel = newRow(l.Name, l.Value or " ")
+			l = normalizeOptions(l, "Label")
+			local title = optionName(l, "Label")
+			local row, descLabel = newRow(title, l.Value or l.Content or " ")
 			row.AutomaticSize = Enum.AutomaticSize.Y
 			descLabel.TextTruncate = Enum.TextTruncate.None
 			descLabel.TextWrapped = true
@@ -1798,7 +1826,7 @@ function MacUI.CreateWindow(opts)
 				options = { Name = tostring(options or "Textbox") }
 			end
 
-			local title = options.Name or options.Title or options.Text or "Textbox"
+			local title = optionName(options, "Textbox")
 			local desc = options.Desc or options.Description
 			local defaultText = options.Default
 			if defaultText == nil then
@@ -1883,7 +1911,7 @@ function MacUI.CreateWindow(opts)
 				options = { Name = tostring(options or "Keybind") }
 			end
 
-			local title = options.Name or options.Title or options.Text or "Keybind"
+			local title = optionName(options, "Keybind")
 			local desc = options.Desc or options.Description
 			local key = options.Default or options.Key or options.KeyCode or Enum.KeyCode.RightControl
 			local callback = options.Callback or options.OnPress or options.Function or function() end
@@ -1982,7 +2010,8 @@ function MacUI.CreateWindow(opts)
 	end
 
 	function Window:AddTab(o)
-		o = o or {}
+		o = normalizeOptions(o, "Tab")
+		o.Name = optionName(o, "Tab")
 		local group
 		if o.Section then
 			group = groups[o.Section]
@@ -2110,6 +2139,7 @@ function MacUI.CreateWindow(opts)
 	-- Some script styles create a section directly from the active window.
 	-- This delegates to the currently selected tab without changing the UI.
 	function Window:AddSection(o)
+		o = normalizeOptions(o, "Section")
 		if not currentTab then
 			error("MacUI: AddSection requires a tab to be created first")
 		end
@@ -2166,10 +2196,10 @@ function MacUI.CreateWindow(opts)
 	end
 
 	function Window:AddSettingsTab(o)
-		o = o or {}
+		o = normalizeOptions(o, "Settings")
 		local tab = Window:AddTab({
 			Section = o.Section or "Settings",
-			Name = o.Name or "Settings",
+			Name = optionName(o, "Settings"),
 			Icon = o.Icon or "gear",
 		})
 
@@ -2298,8 +2328,8 @@ function MacUI.CreateWindow(opts)
 		options = options or {}
 
 		notifyOrder += 1
-		local title = tostring(options.Title or options.Name or "แจ้งเตือน")
-		local content = tostring(options.Content or options.Text or "")
+		local title = tostring(optionName(options, "แจ้งเตือน"))
+		local content = tostring(options.Content or options.Description or options.Text or "")
 		local duration = tonumber(options.Duration) or 3
 		duration = math.max(0, duration)
 
