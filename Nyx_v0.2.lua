@@ -103,50 +103,77 @@ end
 ----------------------------------------------------------------------
 local IconDefs = {
 	home = function(a)
-		a.line(2.2, 7.1, 8, 2.3, 1.5); a.line(8, 2.3, 13.8, 7.1, 1.5)
-		a.line(3.4, 6.6, 3.4, 13.7, 1.5); a.line(12.6, 6.6, 12.6, 13.7, 1.5); a.line(3.4, 13.7, 12.6, 13.7, 1.5)
-		a.line(6.4, 13.7, 6.4, 9.4, 1.35); a.line(6.4, 9.4, 9.6, 9.4, 1.35); a.line(9.6, 9.4, 9.6, 13.7, 1.35)
+		a.line(2.2, 7.2, 8, 2.4, 1.35); a.line(8, 2.4, 13.8, 7.2, 1.35)
+		a.line(3.4, 6.5, 3.4, 13.6, 1.35); a.line(12.6, 6.5, 12.6, 13.6, 1.35)
+		a.line(3.4, 13.6, 12.6, 13.6, 1.35)
+		a.line(6.4, 13.6, 6.4, 9.5, 1.25); a.line(6.4, 9.5, 9.6, 9.5, 1.25); a.line(9.6, 9.5, 9.6, 13.6, 1.25)
 	end,
+
 	sprout = function(a)
-		a.line(8, 14, 8, 7.7, 1.35); a.line(8, 8.2, 5.1, 5.4, 1.3); a.line(8, 7.3, 10.9, 4.7, 1.3)
-		a.ring(2.4, 2.8, 5.2, 3.7, 2.1, 1.3); a.ring(8.5, 2.1, 5.2, 3.7, 2.1, 1.3)
+		a.line(8, 14.2, 8, 7.4, 1.25)
+		a.line(8, 8.1, 4.5, 5.0, 1.25); a.line(8, 7.2, 11.5, 4.4, 1.25)
+		a.line(4.5, 5.0, 5.0, 3.1, 1.15); a.line(4.5, 5.0, 6.4, 5.2, 1.15)
+		a.line(11.5, 4.4, 11.0, 2.6, 1.15); a.line(11.5, 4.4, 9.7, 4.9, 1.15)
 	end,
+
 	bag = function(a)
-		a.line(4, 6, 4, 13.3, 1.45); a.line(12, 6, 12, 13.3, 1.45); a.line(4, 13.3, 12, 13.3, 1.45)
-		a.line(4, 6, 12, 6, 1.45); a.line(5.2, 6, 5.2, 4.1, 1.3); a.line(10.8, 6, 10.8, 4.1, 1.3); a.line(5.2, 4.1, 10.8, 4.1, 1.3)
+		a.outline(3.2, 5.2, 9.6, 9.2, 2.0, 1.25)
+		a.line(5.3, 5.2, 5.3, 3.8, 1.2); a.line(10.7, 5.2, 10.7, 3.8, 1.2)
+		a.line(5.3, 3.8, 10.7, 3.8, 1.2)
 	end,
+
 	arrow = function(a)
-		a.line(2.6, 8, 13.1, 8, 1.5); a.line(9, 4, 13, 8, 1.5); a.line(9, 12, 13, 8, 1.5); a.line(3.2, 4.4, 3.2, 11.6, 1.3)
+		a.line(2.4, 8, 13.0, 8, 1.3)
+		a.line(9.0, 4.0, 13.0, 8, 1.3); a.line(9.0, 12.0, 13.0, 8, 1.3)
+		a.line(3.1, 4.5, 3.1, 11.5, 1.15)
 	end,
+
 	shield = function(a)
-		a.line(8, 1.8, 13, 4.1, 1.4); a.line(13, 4.1, 12, 10.5, 1.4); a.line(12, 10.5, 8, 14.2, 1.4); a.line(8, 14.2, 4, 10.5, 1.4); a.line(4, 10.5, 3, 4.1, 1.4); a.line(3, 4.1, 8, 1.8, 1.4)
-		a.line(5.3, 8.1, 7.2, 10, 1.3); a.line(7.2, 10, 10.8, 6.1, 1.3)
+		a.line(8, 1.8, 12.8, 4.0, 1.3); a.line(12.8, 4.0, 11.9, 10.3, 1.3)
+		a.line(11.9, 10.3, 8, 14.1, 1.3); a.line(8, 14.1, 4.1, 10.3, 1.3)
+		a.line(4.1, 10.3, 3.2, 4.0, 1.3); a.line(3.2, 4.0, 8, 1.8, 1.3)
+		a.line(5.3, 8.1, 7.2, 10.0, 1.2); a.line(7.2, 10.0, 10.7, 6.2, 1.2)
 	end,
+
 	dumbbell = function(a)
-		a.line(4.1, 8, 11.9, 8, 1.5); a.line(2.2, 5, 2.2, 11, 1.5); a.line(4.3, 4, 4.3, 12, 1.5); a.line(11.7, 4, 11.7, 12, 1.5); a.line(13.8, 5, 13.8, 11, 1.5)
+		a.line(4.0, 8, 12.0, 8, 1.3)
+		a.line(2.0, 5.0, 2.0, 11.0, 1.3); a.line(4.1, 4.0, 4.1, 12.0, 1.3)
+		a.line(11.9, 4.0, 11.9, 12.0, 1.3); a.line(14.0, 5.0, 14.0, 11.0, 1.3)
 	end,
+
 	pin = function(a)
-		a.ring(3.2, 1.7, 9.6, 9.6, 4.8, 1.4); a.line(5.2, 9.1, 8, 14.2, 1.4); a.line(10.8, 9.1, 8, 14.2, 1.4); a.fill(7.2, 5.6, 1.6, 1.6, 0.8)
+		a.ring(3.0, 1.8, 10.0, 10.0, 5.0, 1.25)
+		a.line(5.1, 9.5, 8, 14.1, 1.25); a.line(10.9, 9.5, 8, 14.1, 1.25)
+		a.ring(6.6, 5.4, 2.8, 2.8, 1.4, 1.15)
 	end,
+
 	gear = function(a)
-		a.ring(3.5, 3.5, 9, 9, 4.5, 1.5); a.ring(6.2, 6.2, 3.6, 3.6, 1.6, 1.3)
-		a.line(8, 0.9, 8, 3, 1.45); a.line(8, 13, 8, 15.1, 1.45); a.line(0.9, 8, 3, 8, 1.45); a.line(13, 8, 15.1, 8, 1.45)
+		a.ring(3.0, 3.0, 10.0, 10.0, 5.0, 1.25); a.ring(6.0, 6.0, 4.0, 4.0, 2.0, 1.15)
+		a.line(8, 0.9, 8, 2.7, 1.25); a.line(8, 13.3, 8, 15.1, 1.25)
+		a.line(0.9, 8, 2.7, 8, 1.25); a.line(13.3, 8, 15.1, 8, 1.25)
 	end,
+
 	user = function(a)
-		a.ring(5, 1.7, 6, 6, 3, 1.4); a.ring(2.6, 9.2, 10.8, 6, 5.2, 1.4)
+		a.ring(5.0, 1.8, 6.0, 6.0, 3.0, 1.25)
+		a.ring(2.4, 9.0, 11.2, 6.0, 5.0, 1.25)
 	end,
+
 	sword = function(a)
-		a.line(3, 13, 12.7, 3.3, 1.55); a.line(2.6, 10.2, 5.8, 13.4, 1.4); a.line(10.7, 5.3, 13.2, 2.8, 1.35)
+		a.line(3.0, 13.0, 12.8, 3.2, 1.3)
+		a.line(2.6, 10.1, 5.9, 13.4, 1.2); a.line(10.6, 5.4, 13.2, 2.8, 1.2)
 	end,
+
 	search = function(a)
-		a.ring(1.8, 1.8, 8.7, 8.7, 4.35, 1.45); a.line(9.6, 9.6, 13.9, 13.9, 1.55)
+		a.ring(1.9, 1.9, 8.6, 8.6, 4.3, 1.3); a.line(9.5, 9.5, 13.9, 13.9, 1.35)
 	end,
+
 	chevron = function(a)
-		a.line(4, 5.8, 8, 10, 1.4); a.line(8, 10, 12, 5.8, 1.4)
+		a.line(4.0, 5.8, 8.0, 9.9, 1.25); a.line(8.0, 9.9, 12.0, 5.8, 1.25)
 	end,
+
 	list = function(a)
-		a.fill(2.2, 3.2, 2, 2, 0.8); a.fill(2.2, 7, 2, 2, 0.8); a.fill(2.2, 10.8, 2, 2, 0.8)
-		a.line(6, 4.2, 13.5, 4.2, 1.3); a.line(6, 8, 13.5, 8, 1.3); a.line(6, 11.8, 13.5, 11.8, 1.3)
+		a.fill(2.0, 3.0, 2.0, 2.0, 1.0); a.fill(2.0, 7.0, 2.0, 2.0, 1.0); a.fill(2.0, 11.0, 2.0, 2.0, 1.0)
+		a.line(6.0, 4.0, 13.5, 4.0, 1.2); a.line(6.0, 8.0, 13.5, 8.0, 1.2); a.line(6.0, 12.0, 13.5, 12.0, 1.2)
 	end,
 }
 
@@ -170,7 +197,7 @@ local function buildIcon(name, parent, size)
 	local root = New("Frame", {
 		BackgroundTransparency = 1,
 		Size = UDim2.fromOffset(s, s),
-		ClipsDescendants = true,
+		ClipsDescendants = false,
 		Parent = parent,
 	})
 	local parts = {}
@@ -185,6 +212,21 @@ local function buildIcon(name, parent, size)
 			Parent = root,
 		}, { Round((radius or 0) * k) })
 		table.insert(parts, { Inst = f, Kind = "fill" })
+	end
+	function api.outline(x, y, w, h, radius, thick)
+		local f = New("Frame", {
+			BackgroundTransparency = 1,
+			BorderSizePixel = 0,
+			Position = UDim2.fromOffset(x * k, y * k),
+			Size = UDim2.fromOffset(w * k, h * k),
+			Parent = root,
+		}, { Round(radius * k) })
+		local st = New("UIStroke", {
+			Thickness = thick * k,
+			ApplyStrokeMode = Enum.ApplyStrokeMode.Border,
+			Parent = f,
+		})
+		table.insert(parts, { Inst = st, Kind = "stroke" })
 	end
 	function api.ring(x, y, w, h, radius, thick)
 		local f = New("Frame", {
@@ -1199,8 +1241,9 @@ function MacUI.CreateWindow(opts)
 
 		local icon
 		if o.Icon then
-			icon = makeIcon(btn, o.Icon, 16)
-			icon.Root.Position = UDim2.new(0, 12, 0.5, -8)
+			icon = makeIcon(btn, o.Icon, 17)
+			icon.Root.AnchorPoint = Vector2.new(0, 0.5)
+			icon.Root.Position = UDim2.new(0, 11, 0.5, 0)
 		end
 		local text = New("TextLabel", {
 			BackgroundTransparency = 1,
@@ -1408,7 +1451,7 @@ end
 ------------------------------------------------------------------
 local Window = MacUI.CreateWindow({
 	Title = "Nyx Hub",
-	Subtitle = "version 1.4",
+	Subtitle = "version 1.5",
     Logo = "rbxassetid://134813417493601",
 	-- Put your logo id INSIDE this table, between the braces, with a comma at the end:
 	-- Theme = "Dark",
