@@ -1,7 +1,7 @@
 -- MacUI Library : macOS-style UI for Roblox (Luau). UI only, no game logic.
 -- This file is an EMPTY window library: no tabs, no demo. It returns the library table.
 --
--- LOAD (after you host this file, see the guide):
+-- LOAD (upload this file to GitHub/Pastebin/etc, then replace the URL with your raw link):
 --   local MacUI = loadstring(game:HttpGet("https://raw.githubusercontent.com/USER/REPO/main/MacUI.lua"))()
 --
 -- USE:
@@ -179,9 +179,10 @@ local function isAssetLike(x)
 	if type(x) ~= "string" then
 		return false
 	end
-	return string.match(x, "^%d+$") ~= nil
-		or string.find(x, "rbxasset", 1, true) ~= nil
-		or string.find(x, "http", 1, true) ~= nil
+	local str = tostring(x)
+	return string.match(str, "^%d+$") ~= nil
+		or string.find(str, "rbxasset", 1, true) ~= nil
+		or string.find(str, "http", 1, true) ~= nil
 end
 
 ----------------------------------------------------------------------
@@ -558,6 +559,7 @@ function MacUI.CreateWindow(opts)
 		Name = "MacUI",
 		ResetOnSpawn = false,
 		IgnoreGuiInset = true,
+		DisplayOrder = 999,
 		ZIndexBehavior = Enum.ZIndexBehavior.Sibling,
 	})
 	local ok = pcall(function()
@@ -838,9 +840,13 @@ function MacUI.CreateWindow(opts)
 	local btnDrag = nil
 	local activeSlider = nil
 
+	local function overSearch(pos)
+		local a, sz = searchFrame.AbsolutePosition, searchFrame.AbsoluteSize
+		return pos.X >= a.X and pos.X <= a.X + sz.X and pos.Y >= a.Y and pos.Y <= a.Y + sz.Y
+	end
 	local function makeDraggable(handle)
 		handle.InputBegan:Connect(function(input)
-			if isPress(input) then
+			if isPress(input) and not overSearch(input.Position) then
 				dragging, dragStart, startPos = true, input.Position, main.Position
 			end
 		end)
@@ -859,7 +865,7 @@ function MacUI.CreateWindow(opts)
 			return
 		end
 		if dragging then
-			local d = input.Position - dragStart
+			local d = (input.Position - dragStart) / currentScale
 			main.Position = UDim2.new(
 				startPos.X.Scale, startPos.X.Offset + d.X,
 				startPos.Y.Scale, startPos.Y.Offset + d.Y
@@ -974,6 +980,9 @@ function MacUI.CreateWindow(opts)
 					local m = (q == "") or (string.find(r.Key, q, 1, true) ~= nil)
 					r.Frame.Visible = m
 					if m then
+						if r.Div then
+							r.Div.Visible = secAny
+						end
 						secAny = true
 					end
 				end
@@ -1112,8 +1121,9 @@ function MacUI.CreateWindow(opts)
 				LayoutOrder = Section._count,
 				Parent = card,
 			})
+			local div
 			if Section._count > 1 then
-				themed(New("Frame", {
+				div = themed(New("Frame", {
 					Position = UDim2.fromOffset(14, 0),
 					Size = UDim2.new(1, -28, 0, 1),
 					BorderSizePixel = 0,
@@ -1139,6 +1149,7 @@ function MacUI.CreateWindow(opts)
 			}, "SubText")
 			table.insert(secEntry.Rows, {
 				Frame = row,
+				Div = div,
 				Key = string.lower(table.concat({
 					tab.Name or "", o.Title or "", o.Desc or "", title or "", desc or "",
 				}, " ")),
@@ -1343,13 +1354,14 @@ function MacUI.CreateWindow(opts)
 			}, { Round(3) }), { BackgroundColor3 = "Accent" })
 
 			local function render()
-				fill.Size = UDim2.fromScale((value - min) / (max - min), 1)
+				local span = max - min
+				fill.Size = UDim2.fromScale(span > 0 and (value - min) / span or 0, 1)
 				valueLabel.Text = tostring(value) .. (s.Suffix or "")
 			end
 			render()
 
 			local function fromX(x)
-				local a = math.clamp((x - bar.AbsolutePosition.X) / bar.AbsoluteSize.X, 0, 1)
+				local a = math.clamp((x - bar.AbsolutePosition.X) / math.max(bar.AbsoluteSize.X, 1), 0, 1)
 				local v = min + (max - min) * a
 				v = math.floor(v / inc + 0.5) * inc
 				v = math.clamp(tonumber(string.format("%.4f", v)), min, max)
@@ -1406,10 +1418,22 @@ function MacUI.CreateWindow(opts)
 					task.spawn(b.Callback)
 				end
 			end)
+			local obj = { Instance = btn }
+			function obj:SetText(text)
+				btn.Text = tostring(text)
+			end
+			return obj
 		end
 
 		function Section:AddLabel(l)
-			local _, descLabel = newRow(l.Name, l.Value or " ")
+			local row, descLabel = newRow(l.Name, l.Value or " ")
+			row.AutomaticSize = Enum.AutomaticSize.Y
+			descLabel.TextTruncate = Enum.TextTruncate.None
+			descLabel.TextWrapped = true
+			descLabel.TextYAlignment = Enum.TextYAlignment.Top
+			descLabel.AutomaticSize = Enum.AutomaticSize.Y
+			descLabel.Size = UDim2.new(1, -28, 0, 16)
+			New("UIPadding", { PaddingBottom = UDim.new(0, 10), Parent = descLabel })
 			local obj = {}
 			function obj:Set(text)
 				descLabel.Text = text
@@ -1540,17 +1564,33 @@ function MacUI.CreateWindow(opts)
 	end
 
 	-- settings tab (theme, glass, accent, size)
+	local ui: any = {} -- settings-tab controls, kept in sync with the Window:Set* functions
 	function Window:SetTheme(name)
 		if Presets[name] then
 			loadPreset(name)
 			derive()
 			applyTheme()
+			if ui.theme then
+				ui.theme:Set(name)
+			end
 		end
 	end
 	function Window:SetAccent(color)
 		Theme.Accent = color
 		derive()
 		applyTheme()
+		if ui.accent then
+			local nm = "Custom"
+			for n, c in pairs(Accents) do
+				if c == color then
+					nm = n
+				end
+			end
+			ui.accent:Set(nm)
+			ui.r:Set(math.floor(color.R * 255 + 0.5))
+			ui.g:Set(math.floor(color.G * 255 + 0.5))
+			ui.b:Set(math.floor(color.B * 255 + 0.5))
+		end
 	end
 	function Window:SetScale(v)
 		setScale(v)
@@ -1562,6 +1602,10 @@ function MacUI.CreateWindow(opts)
 			glassAmount = amount
 		end
 		refreshGlass()
+		if ui.glassToggle then
+			ui.glassToggle:Set(glassOn)
+			ui.glassSlider:Set(glassOn and math.floor(glassAmount * 100 + 0.5) or 0)
+		end
 	end
 
 	function Window:AddSettingsTab(o)
@@ -1573,59 +1617,67 @@ function MacUI.CreateWindow(opts)
 		})
 
 		local look = tab:AddSection({ Title = "Appearance", Desc = "Change the UI color tone." })
-		look:AddDropdown({
+		ui.theme = look:AddDropdown({
 			Name = "Theme",
 			Desc = "Base colors of the window.",
 			Options = PresetNames,
-			Default = opts.Theme or "Dark",
+			Default = (opts.Theme and Presets[opts.Theme]) and opts.Theme or "Dark",
 			Callback = function(v)
 				Window:SetTheme(v)
 			end,
 		})
-		look:AddToggle({
+		ui.glassToggle = look:AddToggle({
 			Name = "Glass background",
 			Desc = "See-through window.",
 			Default = glassOn,
 			Callback = function(v)
 				glassOn = v
 				refreshGlass()
+				ui.glassSlider:Set(v and math.floor(glassAmount * 100 + 0.5) or 0)
 			end,
 		})
-		look:AddSlider({
+		ui.glassSlider = look:AddSlider({
 			Name = "Glass amount",
 			Desc = "How see-through the window is.",
 			Min = 0, Max = 60, Increment = 5, Suffix = "%",
-			Default = math.floor(glassAmount * 100 + 0.5),
+			Default = glassOn and math.floor(glassAmount * 100 + 0.5) or 0,
 			Callback = function(v)
-				glassAmount = v / 100
+				if v <= 0 then
+					glassOn = false
+				else
+					glassOn = true
+					glassAmount = v / 100
+				end
 				refreshGlass()
+				ui.glassToggle:Set(glassOn)
 			end,
 		})
 
 		local r, g, b
-		local function updateSliders(c)
-			r:Set(math.floor(c.R * 255 + 0.5))
-			g:Set(math.floor(c.G * 255 + 0.5))
-			b:Set(math.floor(c.B * 255 + 0.5))
-		end
 		local function fromSliders()
 			Window:SetAccent(Color3.fromRGB(r:Get(), g:Get(), b:Get()))
 		end
 
-		look:AddDropdown({
+		local startC = Theme.Accent
+		local startAccent = "Custom"
+		for n, c in pairs(Accents) do
+			if c == startC then
+				startAccent = n
+			end
+		end
+		ui.accent = look:AddDropdown({
 			Name = "Accent color",
 			Desc = "Switches, sliders and highlights.",
 			Options = AccentNames,
-			Default = "Blue",
+			Default = startAccent,
 			Callback = function(v)
 				Window:SetAccent(Accents[v])
-				updateSliders(Accents[v])
 			end,
 		})
-		local startC = Theme.Accent
 		r = look:AddSlider({ Name = "Accent red", Min = 0, Max = 255, Default = math.floor(startC.R * 255 + 0.5), Callback = fromSliders })
 		g = look:AddSlider({ Name = "Accent green", Min = 0, Max = 255, Default = math.floor(startC.G * 255 + 0.5), Callback = fromSliders })
 		b = look:AddSlider({ Name = "Accent blue", Min = 0, Max = 255, Default = math.floor(startC.B * 255 + 0.5), Callback = fromSliders })
+		ui.r, ui.g, ui.b = r, g, b
 
 		local win = tab:AddSection({ Title = "Window", Desc = "Size and controls." })
 		scaleSlider = win:AddSlider({
