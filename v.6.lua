@@ -99,6 +99,35 @@ local function normalizeAsset(id)
 end
 
 ----------------------------------------------------------------------
+-- ICON TEXTURES
+-- ใส่ Texture/Image ID ของคุณตรงนี้ได้เลย
+-- ตัวอย่าง: Farming = "123456789" หรือ "rbxassetid://123456789"
+-- ถ้ายังไม่ใส่ จะ fallback ไปใช้ built-in icon เดิม
+----------------------------------------------------------------------
+local IconTextures = {
+	Farming  = nil, -- "123456789"
+	Loadout  = "119764640250310", -- "123456789"
+	Movement = nil, -- "123456789"
+	Equip    = nil, -- "123456789"
+	Training = nil, -- "123456789"
+	Travel   = nil, -- "123456789"
+	Settings = nil, -- "123456789"
+	Character = nil, -- "123456789"
+	Home     = nil, -- "123456789"
+	Combat   = nil, -- "123456789"
+	Search   = nil, -- "123456789"
+	List     = nil, -- "123456789"
+	Chevron  = nil, -- "123456789"
+}
+
+local function getIconTexture(name)
+	if not name then
+		return nil
+	end
+	return IconTextures[name] or IconTextures[string.lower(name)]
+end
+
+----------------------------------------------------------------------
 -- drawn icons (16x16 grid)
 ----------------------------------------------------------------------
 local IconDefs = {
@@ -269,29 +298,41 @@ end
 
 local function makeIcon(parent, icon, size)
 	size = size or 16
-	local name = resolveIconName(icon)
+
+	-- icon can be: texture id, URL, or built-in icon name
+	local img = normalizeAsset(icon)
+	if img and (string.find(img, "rbxasset") or string.find(img, "http")) then
+		local image = New("ImageLabel", {
+			Name = "Icon",
+			BackgroundTransparency = 1,
+			Image = img,
+			ImageColor3 = Color3.fromRGB(255, 255, 255),
+			ImageTransparency = 0,
+			ScaleType = Enum.ScaleType.Fit,
+			Size = UDim2.fromOffset(size, size),
+			Parent = parent,
+		})
+
+		return {
+			Kind = "image",
+			Root = image,
+		}
+	end
+
+	-- built-in fallback
+	local name = type(icon) == "string" and resolveIconName(icon) or nil
 	if name then
 		return buildIcon(name, parent, size)
 	end
-	local img = normalizeAsset(icon)
-	if string.find(img, "rbxasset") or string.find(img, "http") then
-		return {
-			Kind = "image",
-			Root = New("ImageLabel", {
-				BackgroundTransparency = 1,
-				Image = img,
-				Size = UDim2.fromOffset(size, size),
-				Parent = parent,
-			}),
-		}
-	end
+
 	return {
 		Kind = "text",
 		Root = New("TextLabel", {
+			Name = "Icon",
 			BackgroundTransparency = 1,
-			Text = icon,
+			Text = tostring(icon or ""),
 			Font = Enum.Font.Gotham,
-			TextSize = size - 2,
+			TextSize = math.max(size - 2, 8),
 			Size = UDim2.fromOffset(size, size),
 			Parent = parent,
 		}),
@@ -299,17 +340,22 @@ local function makeIcon(parent, icon, size)
 end
 
 local function tintIcon(ic, color)
+	if not ic or not ic.Root then
+		return
+	end
+
 	if ic.Kind == "drawn" then
 		for _, p in ipairs(ic.Parts) do
 			if p.Kind == "fill" then
 				p.Inst.BackgroundColor3 = color
-			else
+			elseif p.Kind == "stroke" then
 				p.Inst.Color = color
 			end
 		end
 	elseif ic.Kind == "image" then
+		-- Texture ID is automatically recolored to the current UI theme color.
 		ic.Root.ImageColor3 = color
-	else
+	elseif ic.Kind == "text" then
 		ic.Root.TextColor3 = color
 	end
 end
@@ -1246,8 +1292,9 @@ function MacUI.CreateWindow(opts)
 		}, { Round(2) }), { BackgroundColor3 = "Accent" })
 
 		local icon
-		if o.Icon then
-			icon = makeIcon(btn, o.Icon, 17)
+		local iconSource = getIconTexture(o.Name) or o.Icon
+		if iconSource then
+			icon = makeIcon(btn, iconSource, 17)
 			icon.Root.AnchorPoint = Vector2.new(0, 0.5)
 			icon.Root.Position = UDim2.new(0, 11, 0.5, 0)
 		end
@@ -1329,7 +1376,7 @@ function MacUI.CreateWindow(opts)
 		local tab = Window:AddTab({
 			Section = o.Section or "Settings",
 			Name = o.Name or "Settings",
-			Icon = o.Icon or "119830582088398",
+			Icon = o.Icon or "gear",
 		})
 
 		local look = tab:AddSection({ Title = "Appearance", Desc = "Change the UI color tone." })
@@ -1457,18 +1504,20 @@ end
 ------------------------------------------------------------------
 local Window = MacUI.CreateWindow({
 	Title = "Nyx Hub",
-	Subtitle = "version 1.6.1",
+	Subtitle = "version 1.5",
     Logo = "rbxassetid://134813417493601",
 	-- Put your logo id INSIDE this table, between the braces, with a comma at the end:
 	-- Theme = "Dark",
 	-- OnDestroy = function() print("script unloaded") end,
 })
 
+-- Icon IDs are controlled from IconTextures near the top of this file.
+-- You do NOT need to edit these Icon values unless you want a per-tab fallback.
 local Farming = Window:AddTab({ Section = "Auto Farm", Name = "Farming", Icon = "sprout" })
 local Loadout = Window:AddTab({ Section = "Combat", Name = "Loadout", Icon = "bag" })
 local Movement = Window:AddTab({ Section = "Character", Name = "Movement", Icon = "arrow" })
-local Equip = Window:AddTab({ Section = "Accessories", Name = "Equip", Icon = "119764640250310" })
-local Travel = Window:AddTab({ Section = "Navigation", Name = "Travel", Icon = "119830582088398" })
+local Equip = Window:AddTab({ Section = "Accessories", Name = "Equip", Icon = "shield" })
+local Travel = Window:AddTab({ Section = "Navigation", Name = "Travel", Icon = "pin" })
 
 local General = Farming:AddSection({ Title = "General", Desc = "Main toggles for this tab." })
 General:AddToggle({
