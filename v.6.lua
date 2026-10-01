@@ -1,12 +1,13 @@
--- MacUI v3 : custom macOS-style UI (Luau). UI only, no game logic.
+-- MacUI (fixed) : custom macOS-style UI (Luau). UI only, no game logic.
 -- Red    = close script (asks to confirm)
--- Yellow = change UI size
+-- Yellow = switch between 2 sizes (small / large, limited to your screen)
 -- Green  = hide UI (open again with the logo button or RightShift)
 --
--- Built-in icons (drawn from shapes, no asset ids needed, they follow the theme color):
---   sprout, bag, arrow, shield, dumbbell, pin, gear, user, home, sword, search, list
---   aliases: farming, loadout, movement, equip, training, travel, settings, character, combat
--- Icon can also be an asset id: "rbxassetid://123" or just "123".
+-- ICONS
+--   1) Put your Image IDs in the IconTextures table below (by tab name).
+--   2) Anything without an ID falls back to the built-in drawn icon.
+--   Icon IDs must be IMAGE ids (not Decal ids). Use a WHITE icon on a transparent background
+--   so it can follow the theme color. If your icons are colored or black, set Tint = false.
 
 local Players = game:GetService("Players")
 local UIS = game:GetService("UserInputService")
@@ -87,6 +88,15 @@ local function isMove(input)
 		or input.UserInputType == Enum.UserInputType.Touch
 end
 
+-- fires on the very first press (no need to click twice)
+local function onPress(btn, fn)
+	btn.InputBegan:Connect(function(input)
+		if isPress(input) then
+			fn()
+		end
+	end)
+end
+
 local function normalizeAsset(id)
 	if id == nil or id == "" then
 		return nil
@@ -99,58 +109,73 @@ local function normalizeAsset(id)
 end
 
 ----------------------------------------------------------------------
--- ICON TEXTURES
--- ใส่ Texture/Image ID ของคุณตรงนี้ได้เลย
--- ตัวอย่าง: Farming = "123456789" หรือ "rbxassetid://123456789"
--- ถ้ายังไม่ใส่ จะ fallback ไปใช้ built-in icon เดิม
--- แนะนำ Texture สีขาว + พื้นหลังโปร่งใส เพื่อให้เปลี่ยนสีตาม Theme ได้
+-- ICON TEXTURES  (put your Image IDs here)
+--   Farming = "123456789"                      -> tinted with the theme color
+--   Farming = { Id = "123456789", Tint = false } -> shown as-is (colored / black icons)
+-- Keys are tab names (not case sensitive). You can add your own tab names too.
+-- Search / Chevron / Close / List are the small icons used inside the UI.
 ----------------------------------------------------------------------
+local TINT_IMAGE_ICONS = true -- default for icons that do not set Tint themselves
+
 local IconTextures = {
-	Farming  = "119764640250310", -- "123456789"
-	Loadout  = "119764640250310", -- "123456789"
-	Movement = nil, -- "123456789"
-	Equip    = nil, -- "123456789"
-	Training = nil, -- "123456789"
-	Travel   = nil, -- "123456789"
-	Settings = nil, -- "123456789"
-	Character = nil, -- "123456789"
-	Home     = nil, -- "123456789"
-	Combat   = nil, -- "123456789"
-	Search   = nil, -- "123456789"
-	List     = nil, -- "123456789"
-	Chevron  = nil, -- "123456789"
+	Farming   = "119764640250310",
+	Loadout   = "119764640250310",
+	Movement  = nil,
+	Equip     = nil,
+	Training  = nil,
+	Travel    = nil,
+	Settings  = nil,
+	Character = nil,
+	Home      = nil,
+	Combat    = nil,
+	Search    = nil,
+	List      = nil,
+	Chevron   = nil,
+	Close     = nil,
 }
 
+-- case-insensitive index
+local TextureIndex = {}
+for k, v in pairs(IconTextures) do
+	if v ~= nil and v ~= "" then
+		TextureIndex[string.lower(k)] = v
+	end
+end
+
 local function getIconTexture(name)
-	if not name then
+	if type(name) ~= "string" then
 		return nil
 	end
-	return IconTextures[name] or IconTextures[string.lower(name)]
+	return TextureIndex[string.lower(name)]
 end
 
--- Returns a texture ID if one was configured for the tab/icon.
--- You can put either a number string or a full rbxassetid:// string.
+-- returns the configured texture for `name`, otherwise `fallback`
 local function getConfiguredIcon(name, fallback)
-	local texture = getIconTexture(name)
-	if texture and texture ~= "" then
-		return texture
+	return getIconTexture(name) or fallback
+end
+
+local function isAssetLike(x)
+	if type(x) == "table" then
+		return x.Id ~= nil
 	end
-	return fallback
+	if type(x) ~= "string" then
+		return false
+	end
+	return string.match(x, "^%d+$") ~= nil
+		or string.find(x, "rbxasset", 1, true) ~= nil
+		or string.find(x, "http", 1, true) ~= nil
 end
 
 ----------------------------------------------------------------------
--- drawn icons (16x16 grid)
+-- drawn icons (16x16 grid) - used when no texture id is set
 ----------------------------------------------------------------------
 local IconDefs = {
-	-- Sidebar icons styled to match the reference image:
-	-- compact, thin, rounded line icons with consistent 16x16 geometry.
 	home = function(a)
 		a.line(2.4, 7.1, 8, 2.5, 1.2); a.line(8, 2.5, 13.6, 7.1, 1.2)
 		a.line(3.5, 6.4, 3.5, 13.6, 1.2); a.line(12.5, 6.4, 12.5, 13.6, 1.2)
 		a.line(3.5, 13.6, 12.5, 13.6, 1.2); a.line(6.4, 13.6, 6.4, 9.5, 1.2); a.line(6.4, 9.5, 9.6, 9.5, 1.2); a.line(9.6, 9.5, 9.6, 13.6, 1.2)
 	end,
 
-	-- Farming: small ascending bar/chart mark like the reference.
 	sprout = function(a)
 		a.fill(2.2, 9.8, 2.2, 3.6, 0.7)
 		a.fill(5.4, 7.2, 2.2, 6.2, 0.7)
@@ -158,14 +183,12 @@ local IconDefs = {
 		a.line(11.2, 13.4, 13.6, 11.0, 1.15)
 	end,
 
-	-- Loadout: compact backpack/bag.
 	bag = function(a)
 		a.outline(3.0, 5.0, 10.0, 9.0, 2.0, 1.2)
 		a.line(5.3, 5.0, 5.3, 3.7, 1.15); a.line(10.7, 5.0, 10.7, 3.7, 1.15); a.line(5.3, 3.7, 10.7, 3.7, 1.15)
 		a.line(3.2, 8.0, 12.8, 8.0, 1.0)
 	end,
 
-	-- Movement: simple running/person silhouette.
 	arrow = function(a)
 		a.ring(8.8, 2.2, 3.0, 3.0, 1.5, 1.15)
 		a.line(8.0, 6.0, 6.0, 9.0, 1.25)
@@ -175,21 +198,18 @@ local IconDefs = {
 		a.line(7.0, 7.1, 11.6, 6.2, 1.15)
 	end,
 
-	-- Equip: shield/lock-like protection icon.
 	shield = function(a)
 		a.line(8, 1.9, 12.5, 4.0, 1.2); a.line(12.5, 4.0, 11.7, 10.2, 1.2); a.line(11.7, 10.2, 8, 14.0, 1.2)
 		a.line(8, 14.0, 4.3, 10.2, 1.2); a.line(4.3, 10.2, 3.5, 4.0, 1.2); a.line(3.5, 4.0, 8, 1.9, 1.2)
 		a.line(6.0, 8.0, 7.3, 9.3, 1.1); a.line(7.3, 9.3, 10.2, 6.4, 1.1)
 	end,
 
-	-- Training: compact binoculars icon.
 	dumbbell = function(a)
 		a.ring(4.5, 4.0, 4.2, 7.0, 2.1, 1.15); a.ring(7.3, 4.0, 4.2, 7.0, 2.1, 1.15)
 		a.line(8.0, 6.0, 8.0, 9.0, 1.15)
 		a.line(2.4, 5.0, 2.4, 10.0, 1.15); a.line(13.6, 5.0, 13.6, 10.0, 1.15)
 	end,
 
-	-- Travel: map pin.
 	pin = function(a)
 		a.ring(3.2, 1.8, 9.6, 9.6, 4.8, 1.2)
 		a.line(5.0, 9.5, 8.0, 14.0, 1.2); a.line(11.0, 9.5, 8.0, 14.0, 1.2)
@@ -215,6 +235,10 @@ local IconDefs = {
 
 	chevron = function(a)
 		a.line(4.0, 5.8, 8.0, 9.9, 1.15); a.line(8.0, 9.9, 12.0, 5.8, 1.15)
+	end,
+
+	close = function(a)
+		a.line(4.2, 4.2, 11.8, 11.8, 1.2); a.line(11.8, 4.2, 4.2, 11.8, 1.2)
 	end,
 
 	list = function(a)
@@ -259,21 +283,6 @@ local function buildIcon(name, parent, size)
 		}, { Round((radius or 0) * k) })
 		table.insert(parts, { Inst = f, Kind = "fill" })
 	end
-	function api.outline(x, y, w, h, radius, thick)
-		local f = New("Frame", {
-			BackgroundTransparency = 1,
-			BorderSizePixel = 0,
-			Position = UDim2.fromOffset(x * k, y * k),
-			Size = UDim2.fromOffset(w * k, h * k),
-			Parent = root,
-		}, { Round(radius * k) })
-		local st = New("UIStroke", {
-			Thickness = thick * k,
-			ApplyStrokeMode = Enum.ApplyStrokeMode.Border,
-			Parent = f,
-		})
-		table.insert(parts, { Inst = st, Kind = "stroke" })
-	end
 	function api.ring(x, y, w, h, radius, thick)
 		local f = New("Frame", {
 			BackgroundTransparency = 1,
@@ -289,6 +298,7 @@ local function buildIcon(name, parent, size)
 		})
 		table.insert(parts, { Inst = st, Kind = "stroke" })
 	end
+	api.outline = api.ring
 	function api.line(x1, y1, x2, y2, t)
 		local dx, dy = x2 - x1, y2 - y1
 		local len = math.sqrt(dx * dx + dy * dy)
@@ -307,32 +317,36 @@ local function buildIcon(name, parent, size)
 	return { Root = root, Parts = parts, Kind = "drawn" }
 end
 
+-- icon can be: texture id string / rbxassetid / { Id = , Tint = } / built-in name / emoji text
 local function makeIcon(parent, icon, size)
 	size = size or 16
 
-	-- Asset/Texture ID has priority.
-	-- This allows the caller to pass either "123456" or "rbxassetid://123456".
-	local img = normalizeAsset(icon)
-	if img and (string.find(img, "rbxasset") or string.find(img, "http")) then
+	if isAssetLike(icon) then
+		local id, tint
+		if type(icon) == "table" then
+			id, tint = normalizeAsset(icon.Id), icon.Tint
+		else
+			id = normalizeAsset(icon)
+		end
+		if tint == nil then
+			tint = TINT_IMAGE_ICONS
+		end
 		local image = New("ImageLabel", {
 			Name = "Icon",
 			BackgroundTransparency = 1,
 			BorderSizePixel = 0,
-			Image = img,
-			ImageColor3 = Color3.fromRGB(255, 255, 255),
-			ImageTransparency = 0,
+			Image = id,
+			ImageColor3 = Color3.new(1, 1, 1),
 			ScaleType = Enum.ScaleType.Fit,
 			Size = UDim2.fromOffset(size, size),
 			Parent = parent,
 		})
-
-		return {
-			Kind = "image",
-			Root = image,
-		}
+		return { Kind = "image", Root = image, Tint = tint }
 	end
 
-	-- If no texture was supplied, keep the original built-in icon system.
+	if type(icon) ~= "string" then
+		icon = "list"
+	end
 	local name = resolveIconName(icon)
 	if name then
 		return buildIcon(name, parent, size)
@@ -343,7 +357,7 @@ local function makeIcon(parent, icon, size)
 		Root = New("TextLabel", {
 			Name = "Icon",
 			BackgroundTransparency = 1,
-			Text = icon or "",
+			Text = icon,
 			Font = Enum.Font.Gotham,
 			TextSize = size - 2,
 			Size = UDim2.fromOffset(size, size),
@@ -356,26 +370,21 @@ local function tintIcon(ic, color)
 	if not ic then
 		return
 	end
-
 	if ic.Kind == "drawn" then
 		for _, p in ipairs(ic.Parts) do
 			if p.Kind == "fill" then
 				p.Inst.BackgroundColor3 = color
-			elseif p.Kind == "stroke" then
+			else
 				p.Inst.Color = color
 			end
 		end
-
 	elseif ic.Kind == "image" then
-		-- IMPORTANT:
-		-- ImageColor3 works as a tint/multiply operation.
-		-- For the icon to change from white/gray into the Theme color,
-		-- the uploaded Texture should have a transparent background and
-		-- a white/light icon. A pure black source cannot be recolored
-		-- by ImageColor3 because black multiplied by any color stays black.
-		ic.Root.ImageColor3 = color
-
-	elseif ic.Kind == "text" then
+		-- ImageColor3 multiplies the image color: a white icon takes the theme color,
+		-- a black icon stays black. Use Tint = false for colored / black icons.
+		if ic.Tint ~= false then
+			ic.Root.ImageColor3 = color
+		end
+	else
 		ic.Root.TextColor3 = color
 	end
 end
@@ -390,9 +399,21 @@ function MacUI.CreateWindow(opts)
 	local Theme = {}
 	local hooks = {}
 
+	-- glass: 0 = solid window, higher = more see-through
+	local glassAmount = (opts.Glass ~= nil) and opts.Glass or 0.18
+	local glassOn = glassAmount > 0
+	if not glassOn then
+		glassAmount = 0.18
+	end
+
 	local function derive()
 		Theme.Selected = Theme.Accent:Lerp(Color3.new(1, 1, 1), 0.45)
 		Theme.SelectedText = Color3.fromRGB(18, 24, 36)
+		local g = Theme.Glass or 0
+		Theme.GlassMain = g
+		Theme.GlassSide = g * 0.6
+		Theme.GlassCard = g * 0.7
+		Theme.GlassField = g * 0.35
 	end
 	local function loadPreset(name)
 		for k, v in pairs(Presets[name]) do
@@ -401,17 +422,18 @@ function MacUI.CreateWindow(opts)
 	end
 	loadPreset((opts.Theme and Presets[opts.Theme]) and opts.Theme or "Dark")
 	Theme.Accent = opts.Accent or Accents.Blue
-	-- Glass UI: lower values show more of the game/background through the window.
-	local GLASS_WINDOW = 0.18
-	local GLASS_SIDEBAR = 0.24
-	local GLASS_CARD = 0.30
-	local GLASS_FIELD = 0.22
+	Theme.Glass = glassOn and glassAmount or 0
 	derive()
 
 	local function applyTheme()
 		for _, h in ipairs(hooks) do
 			h()
 		end
+	end
+	local function refreshGlass()
+		Theme.Glass = glassOn and glassAmount or 0
+		derive()
+		applyTheme()
 	end
 	local function themed(inst, map)
 		local function h()
@@ -450,6 +472,11 @@ function MacUI.CreateWindow(opts)
 		return themed(New("TextLabel", base), { TextColor3 = key or "Text" })
 	end
 
+	-- small UI icons (search / chevron / close) also use IconTextures when set
+	local function uiIcon(parent, key, fallbackName, size)
+		return makeIcon(parent, getConfiguredIcon(key, fallbackName), size)
+	end
+
 	-- gui root
 	local gui = New("ScreenGui", {
 		Name = "MacUI",
@@ -472,23 +499,26 @@ function MacUI.CreateWindow(opts)
 		BorderSizePixel = 0,
 		ClipsDescendants = true,
 		Parent = gui,
-	}, { Round(12), Stroke("Stroke") }), { BackgroundColor3 = "Window" })
-	main.BackgroundTransparency = GLASS_WINDOW
+	}, { Round(12), Stroke("Stroke") }), { BackgroundColor3 = "Window", BackgroundTransparency = "GlassMain" })
 
+	-- two sizes (yellow button), always limited to what fits on screen
 	local scaleObj = New("UIScale", { Scale = 1, Parent = main })
 	local currentScale = 1
 	local scaleSlider
+	local fitMax = 1.5
 	do
 		local cam = workspace.CurrentCamera
 		if cam then
 			local vp = cam.ViewportSize
-			local fit = math.min(vp.X / (WIDTH + 30), vp.Y / (HEIGHT + 30))
-			if fit < 1 then
-				currentScale = math.max(fit, 0.5)
-			end
+			fitMax = math.min(vp.X / (WIDTH + 30), vp.Y / (HEIGHT + 30))
+		end
+		if fitMax < 1 then
+			currentScale = math.max(fitMax, 0.5)
 		end
 		scaleObj.Scale = currentScale
 	end
+	local SIZE_SMALL = math.max(0.5, math.min(0.85, fitMax))
+	local SIZE_LARGE = math.max(0.5, math.min(1.15, fitMax))
 	local function setScale(v)
 		v = math.clamp(v, 0.5, 1.5)
 		currentScale = v
@@ -498,24 +528,23 @@ function MacUI.CreateWindow(opts)
 		end
 	end
 
-	-- sidebar
-	local sidebar = themed(New("Frame", {
+	-- sidebar: clipped container, so only the left corners are round and nothing overlaps
+	local sideClip = New("Frame", {
 		Size = UDim2.new(0, SIDE, 1, 0),
-		BorderSizePixel = 0,
+		BackgroundTransparency = 1,
+		ClipsDescendants = true,
 		Parent = main,
-	}, { Round(12) }), { BackgroundColor3 = "Sidebar" })
-	sidebar.BackgroundTransparency = GLASS_SIDEBAR
+	})
 	themed(New("Frame", {
-		Size = UDim2.new(0, 12, 1, 0),
-		Position = UDim2.new(1, -12, 0, 0),
+		Size = UDim2.new(0, SIDE + 12, 1, 0),
 		BorderSizePixel = 0,
-		Parent = sidebar,
-	}), { BackgroundColor3 = "Sidebar" })
+		Parent = sideClip,
+	}, { Round(12) }), { BackgroundColor3 = "Sidebar", BackgroundTransparency = "GlassSide" })
 	themed(New("Frame", {
-		Size = UDim2.new(0, 1, 1, 0),
 		Position = UDim2.new(1, -1, 0, 0),
+		Size = UDim2.new(0, 1, 1, 0),
 		BorderSizePixel = 0,
-		Parent = sidebar,
+		Parent = sideClip,
 	}), { BackgroundColor3 = "Stroke" })
 
 	local sideList = New("ScrollingFrame", {
@@ -526,7 +555,7 @@ function MacUI.CreateWindow(opts)
 		ScrollBarThickness = 0,
 		CanvasSize = UDim2.new(),
 		AutomaticCanvasSize = Enum.AutomaticSize.Y,
-		Parent = sidebar,
+		Parent = sideClip,
 	}, {
 		New("UIListLayout", { Padding = UDim.new(0, 2), SortOrder = Enum.SortOrder.LayoutOrder }),
 		New("UIPadding", {
@@ -536,60 +565,98 @@ function MacUI.CreateWindow(opts)
 		}),
 	})
 
-	-- traffic lights
-	local function light(x, color)
-		return New("TextButton", {
+	-- drag strip next to the traffic lights (the lights themselves never start a drag)
+	local dragStrip = New("Frame", {
+		Position = UDim2.fromOffset(84, 0),
+		Size = UDim2.new(1, -85, 0, 44),
+		BackgroundTransparency = 1,
+		Parent = sideClip,
+	})
+
+	-- traffic lights: large invisible hit area, action on the first press
+	local lights = {}
+	local function light(dotX, color, glyph)
+		local hit = New("TextButton", {
 			Text = "",
 			AutoButtonColor = false,
-			Position = UDim2.fromOffset(x, 16),
+			BackgroundTransparency = 1,
+			Position = UDim2.fromOffset(dotX - 4, 9),
+			Size = UDim2.fromOffset(21, 26),
+			ZIndex = 10,
+			Parent = sideClip,
+		})
+		local dot = New("Frame", {
+			AnchorPoint = Vector2.new(0.5, 0.5),
+			Position = UDim2.fromScale(0.5, 0.5),
 			Size = UDim2.fromOffset(13, 13),
 			BackgroundColor3 = color,
 			BorderSizePixel = 0,
-			ZIndex = 10,
-			Parent = sidebar,
+			Parent = hit,
 		}, { Round(7) })
+		local g = New("TextLabel", {
+			BackgroundTransparency = 1,
+			Text = "",
+			Font = Enum.Font.GothamBold,
+			TextSize = 11,
+			TextColor3 = Color3.fromRGB(60, 24, 20),
+			Size = UDim2.fromScale(1, 1),
+			Parent = dot,
+		})
+		table.insert(lights, { Glyph = glyph, Label = g })
+		hit.MouseEnter:Connect(function()
+			for _, o in ipairs(lights) do
+				o.Label.Text = o.Glyph
+			end
+		end)
+		hit.MouseLeave:Connect(function()
+			for _, o in ipairs(lights) do
+				o.Label.Text = ""
+			end
+		end)
+		return hit
 	end
-	-- Activated fires from one press/click on mouse and touch.
-	local red = light(14, Color3.fromRGB(255, 95, 87))
-	local yellow = light(35, Color3.fromRGB(254, 188, 46))
-	local green = light(56, Color3.fromRGB(40, 200, 64))
+	local red = light(14, Color3.fromRGB(255, 95, 87), "×")
+	local yellow = light(35, Color3.fromRGB(254, 188, 46), "+")
+	local green = light(56, Color3.fromRGB(40, 200, 64), "–")
 
-	-- top bar
+	-- top bar (the logo is only shown on the floating open button)
 	local topbar = New("Frame", {
 		Position = UDim2.new(0, SIDE, 0, 0),
 		Size = UDim2.new(1, -SIDE, 0, 44),
 		BackgroundTransparency = 1,
 		Parent = main,
 	})
-	-- Logo is intentionally shown only on the floating open/close button.
-	local logoId = normalizeAsset(opts.Logo)
-	local textX = 16
 	Label({
 		Text = opts.Title or "My Script",
 		Font = Enum.Font.GothamBold,
 		TextSize = 14,
-		Position = UDim2.fromOffset(textX, 6),
-		Size = UDim2.new(1, -textX - 174, 0, 18),
+		Position = UDim2.fromOffset(16, 6),
+		Size = UDim2.new(1, -190, 0, 18),
 		TextTruncate = Enum.TextTruncate.AtEnd,
 		Parent = topbar,
 	}, "Text")
 	Label({
 		Text = opts.Subtitle or "Primary",
 		TextSize = 11,
-		Position = UDim2.fromOffset(textX, 23),
-		Size = UDim2.new(1, -textX - 174, 0, 14),
+		Position = UDim2.fromOffset(16, 23),
+		Size = UDim2.new(1, -190, 0, 14),
 		Parent = topbar,
 	}, "SubText")
 
+	-- search: frame holds icon + text box + clear button; the text is clipped inside the frame
 	local searchFrame = themed(New("Frame", {
 		AnchorPoint = Vector2.new(1, 0.5),
 		Position = UDim2.new(1, -12, 0.5, 0),
 		Size = UDim2.fromOffset(150, 28),
 		BorderSizePixel = 0,
 		Parent = topbar,
-	}, { Round(7) }), {
-		BackgroundColor3 = "Field",
-	})
+	}, { Round(7) }), { BackgroundColor3 = "Field", BackgroundTransparency = "GlassField" })
+	do
+		local si = uiIcon(searchFrame, "Search", "search", 14)
+		si.Root.AnchorPoint = Vector2.new(0, 0.5)
+		si.Root.Position = UDim2.fromOffset(9, 14)
+		themedIcon(si, "SubText")
+	end
 	local searchBox = themed(New("TextBox", {
 		Text = "",
 		PlaceholderText = "Search",
@@ -598,27 +665,36 @@ function MacUI.CreateWindow(opts)
 		TextSize = 12,
 		TextXAlignment = Enum.TextXAlignment.Left,
 		TextYAlignment = Enum.TextYAlignment.Center,
+		TextWrapped = false,
+		ClipsDescendants = true,
 		BackgroundTransparency = 1,
 		BorderSizePixel = 0,
-		Position = UDim2.fromOffset(31, 0),
-		Size = UDim2.new(1, -40, 1, 0),
+		Position = UDim2.fromOffset(30, 0),
+		Size = UDim2.new(1, -54, 1, 0),
 		Parent = searchFrame,
-	}, {
-		New("UIPadding", {
-			PaddingLeft = UDim.new(0, 0),
-			PaddingRight = UDim.new(0, 0),
-			PaddingTop = UDim.new(0, 0),
-			PaddingBottom = UDim.new(0, 0),
-		})
-	}), {
-		TextColor3 = "Text", PlaceholderColor3 = "SubText",
+	}), { TextColor3 = "Text", PlaceholderColor3 = "SubText" })
+	local clearBtn = New("TextButton", {
+		Text = "",
+		AutoButtonColor = false,
+		BackgroundTransparency = 1,
+		AnchorPoint = Vector2.new(1, 0.5),
+		Position = UDim2.new(1, -4, 0.5, 0),
+		Size = UDim2.fromOffset(20, 20),
+		Visible = false,
+		Parent = searchFrame,
 	})
 	do
-		local si = buildIcon("search", searchFrame, 13)
-		si.Root.AnchorPoint = Vector2.new(0, 0.5)
-		si.Root.Position = UDim2.fromOffset(10, 14)
-		themedIcon(si, "SubText")
+		local ci = uiIcon(clearBtn, "Close", "close", 12)
+		ci.Root.AnchorPoint = Vector2.new(0.5, 0.5)
+		ci.Root.Position = UDim2.fromScale(0.5, 0.5)
+		themedIcon(ci, "SubText")
 	end
+	onPress(clearBtn, function()
+		searchBox.Text = ""
+	end)
+	onPress(searchFrame, function()
+		searchBox:CaptureFocus()
+	end)
 
 	local pages = New("Frame", {
 		Position = UDim2.new(0, SIDE, 0, 44),
@@ -634,7 +710,8 @@ function MacUI.CreateWindow(opts)
 		Parent = pages,
 	}, "SubText")
 
-	-- open button: logo only, no background (fallback letter if the image fails to load)
+	-- open button: logo only, no background (letter fallback if the image fails to load)
+	local logoId = normalizeAsset(opts.Logo)
 	local openBtn = New("TextButton", {
 		Name = "OpenButton",
 		Text = "",
@@ -693,7 +770,7 @@ function MacUI.CreateWindow(opts)
 		end)
 	end
 	makeDraggable(topbar)
-	makeDraggable(sidebar)
+	makeDraggable(dragStrip)
 
 	openBtn.InputBegan:Connect(function(input)
 		if isPress(input) then
@@ -811,6 +888,7 @@ function MacUI.CreateWindow(opts)
 		local q = string.lower(searchBox.Text)
 		q = string.gsub(q, "^%s+", "")
 		q = string.gsub(q, "%s+$", "")
+		clearBtn.Visible = (searchBox.Text ~= "")
 		local firstMatch
 		for _, tab in ipairs(tabsList) do
 			local any = false
@@ -877,6 +955,10 @@ function MacUI.CreateWindow(opts)
 		if tab.Icon and not tab.NoTint then
 			tintIcon(tab.Icon, c)
 		end
+		-- untinted image icons: dim them when the tab is not selected
+		if tab.Icon and tab.Icon.Kind == "image" and (tab.NoTint or tab.Icon.Tint == false) then
+			tab.Icon.Root.ImageTransparency = selected and 0 or 0.3
+		end
 	end
 
 	local function selectTab(tab, skipFilter)
@@ -941,9 +1023,8 @@ function MacUI.CreateWindow(opts)
 			LayoutOrder = 3,
 			Parent = holder,
 		}, { Round(8), Stroke("Stroke"), New("UIListLayout", { SortOrder = Enum.SortOrder.LayoutOrder }) }), {
-			BackgroundColor3 = "Card",
+			BackgroundColor3 = "Card", BackgroundTransparency = "GlassCard",
 		})
-		card.BackgroundTransparency = GLASS_CARD
 
 		local function newRow(title, desc)
 			Section._count += 1
@@ -1048,7 +1129,7 @@ function MacUI.CreateWindow(opts)
 				Size = UDim2.fromOffset(150, 26),
 				BorderSizePixel = 0,
 				Parent = row,
-			}, { Round(6), Stroke("Stroke") }), { BackgroundColor3 = "Field" })
+			}, { Round(6), Stroke("Stroke") }), { BackgroundColor3 = "Field", BackgroundTransparency = "GlassField" })
 			local valueLabel = Label({
 				Text = tostring(value),
 				TextSize = 13,
@@ -1057,7 +1138,7 @@ function MacUI.CreateWindow(opts)
 				Size = UDim2.new(1, -30, 1, 0),
 				Parent = btn,
 			}, "Text")
-			local chev = buildIcon("chevron", btn, 14)
+			local chev = uiIcon(btn, "Chevron", "chevron", 14)
 			chev.Root.AnchorPoint = Vector2.new(1, 0.5)
 			chev.Root.Position = UDim2.new(1, -6, 0.5, 0)
 			themedIcon(chev, "SubText")
@@ -1111,7 +1192,7 @@ function MacUI.CreateWindow(opts)
 					catcher:Destroy()
 					pop:Destroy()
 				end
-				catcher.MouseButton1Click:Connect(close)
+				catcher.Activated:Connect(close)
 				for i, opt in ipairs(options) do
 					local item = New("TextButton", {
 						Text = tostring(opt),
@@ -1235,7 +1316,9 @@ function MacUI.CreateWindow(opts)
 				Size = UDim2.fromOffset(80, 26),
 				BorderSizePixel = 0,
 				Parent = row,
-			}, { Round(6), Stroke("Stroke") }), { BackgroundColor3 = "Field", TextColor3 = "Text" })
+			}, { Round(6), Stroke("Stroke") }), {
+				BackgroundColor3 = "Field", BackgroundTransparency = "GlassField", TextColor3 = "Text",
+			})
 			btn.MouseEnter:Connect(function()
 				tween(btn, { BackgroundColor3 = Theme.Off })
 			end)
@@ -1311,8 +1394,14 @@ function MacUI.CreateWindow(opts)
 			Parent = btn,
 		}, { Round(2) }), { BackgroundColor3 = "Accent" })
 
+		-- icon priority: explicit asset id > IconTextures[tab name] > IconTextures[icon name] > built-in drawn icon
+		local iconSource
+		if isAssetLike(o.Icon) then
+			iconSource = o.Icon
+		else
+			iconSource = getIconTexture(o.Name) or getIconTexture(o.Icon) or o.Icon
+		end
 		local icon
-		local iconSource = getIconTexture(o.Name) or o.Icon
 		if iconSource then
 			icon = makeIcon(btn, iconSource, 17)
 			icon.Root.AnchorPoint = Vector2.new(0, 0.5)
@@ -1374,7 +1463,7 @@ function MacUI.CreateWindow(opts)
 		return Tab
 	end
 
-	-- settings tab (theme, accent, size)
+	-- settings tab (theme, glass, accent, size)
 	function Window:SetTheme(name)
 		if Presets[name] then
 			loadPreset(name)
@@ -1390,13 +1479,21 @@ function MacUI.CreateWindow(opts)
 	function Window:SetScale(v)
 		setScale(v)
 	end
+	function Window:SetGlass(amount)
+		amount = math.clamp(amount or 0, 0, 0.6)
+		glassOn = amount > 0
+		if glassOn then
+			glassAmount = amount
+		end
+		refreshGlass()
+	end
 
 	function Window:AddSettingsTab(o)
 		o = o or {}
 		local tab = Window:AddTab({
 			Section = o.Section or "Settings",
 			Name = o.Name or "Settings",
-			Icon = o.Icon or getConfiguredIcon("Settings", "gear"),
+			Icon = o.Icon or "gear",
 		})
 
 		local look = tab:AddSection({ Title = "Appearance", Desc = "Change the UI color tone." })
@@ -1407,6 +1504,25 @@ function MacUI.CreateWindow(opts)
 			Default = opts.Theme or "Dark",
 			Callback = function(v)
 				Window:SetTheme(v)
+			end,
+		})
+		look:AddToggle({
+			Name = "Glass background",
+			Desc = "See-through window.",
+			Default = glassOn,
+			Callback = function(v)
+				glassOn = v
+				refreshGlass()
+			end,
+		})
+		look:AddSlider({
+			Name = "Glass amount",
+			Desc = "How see-through the window is.",
+			Min = 0, Max = 60, Increment = 5, Suffix = "%",
+			Default = math.floor(glassAmount * 100 + 0.5),
+			Callback = function(v)
+				glassAmount = v / 100
+				refreshGlass()
 			end,
 		})
 
@@ -1438,7 +1554,7 @@ function MacUI.CreateWindow(opts)
 		local win = tab:AddSection({ Title = "Window", Desc = "Size and controls." })
 		scaleSlider = win:AddSlider({
 			Name = "UI size",
-			Desc = "Also changed by the yellow button.",
+			Desc = "The yellow button switches 2 sizes.",
 			Min = 0.5, Max = 1.5, Default = currentScale, Increment = 0.05, Suffix = "x",
 			Callback = function(v)
 				currentScale = v
@@ -1483,30 +1599,26 @@ function MacUI.CreateWindow(opts)
 		toggleMain()
 	end
 
-	red.Activated:Connect(function()
+	onPress(red, function()
 		Window:ConfirmClose()
 	end)
-	cancelBtn.Activated:Connect(function()
-		confirm.Visible = false
-	end)
-	closeBtn.Activated:Connect(function()
-		Window:Destroy()
-	end)
-
-	local SIZE_STEPS = { 0.85, 1.15 }
-	yellow.Activated:Connect(function()
-		local nextScale
-		for _, s in ipairs(SIZE_STEPS) do
-			if s > currentScale + 0.01 then
-				nextScale = s
-				break
-			end
+	onPress(yellow, function()
+		local mid = (SIZE_SMALL + SIZE_LARGE) / 2
+		if currentScale >= mid then
+			setScale(SIZE_SMALL)
+		else
+			setScale(SIZE_LARGE)
 		end
-		setScale(nextScale or SIZE_STEPS[1])
 	end)
-	green.Activated:Connect(function()
+	onPress(green, function()
 		confirm.Visible = false
 		main.Visible = false
+	end)
+	onPress(cancelBtn, function()
+		confirm.Visible = false
+	end)
+	onPress(closeBtn, function()
+		Window:Destroy()
 	end)
 
 	local toggleKey = opts.ToggleKey or Enum.KeyCode.RightShift
@@ -1524,44 +1636,19 @@ end
 ------------------------------------------------------------------
 local Window = MacUI.CreateWindow({
 	Title = "Nyx Hub",
-	Subtitle = "version 1.6.5.1",
-    Logo = "rbxassetid://134813417493601",
-	-- Put your logo id INSIDE this table, between the braces, with a comma at the end:
+	Subtitle = "version 1.6.5.2",
+	Logo = "rbxassetid://134813417493601",
+	-- Glass = 0.18,   -- 0 = solid window, up to 0.6 = very see-through
 	-- Theme = "Dark",
 	-- OnDestroy = function() print("script unloaded") end,
 })
 
--- Icon IDs are controlled from IconTextures near the top of this file.
--- You do NOT need to edit these Icon values unless you want a per-tab fallback.
-local Farming = Window:AddTab({
-	Section = "Auto Farm",
-	Name = "Farming",
-	Icon = getConfiguredIcon("Farming", "sprout"),
-})
-
-local Loadout = Window:AddTab({
-	Section = "Combat",
-	Name = "Loadout",
-	Icon = getConfiguredIcon("Loadout", "bag"),
-})
-
-local Movement = Window:AddTab({
-	Section = "Character",
-	Name = "Movement",
-	Icon = getConfiguredIcon("Movement", "arrow"),
-})
-
-local Equip = Window:AddTab({
-	Section = "Accessories",
-	Name = "Equip",
-	Icon = getConfiguredIcon("Equip", "shield"),
-})
-
-local Travel = Window:AddTab({
-	Section = "Navigation",
-	Name = "Travel",
-	Icon = getConfiguredIcon("Travel", "pin"),
-})
+-- Tab icons come from IconTextures (matched by tab name). The Icon value here is only the fallback.
+local Farming = Window:AddTab({ Section = "Auto Farm", Name = "Farming", Icon = "sprout" })
+local Loadout = Window:AddTab({ Section = "Combat", Name = "Loadout", Icon = "bag" })
+local Movement = Window:AddTab({ Section = "Character", Name = "Movement", Icon = "arrow" })
+local Equip = Window:AddTab({ Section = "Accessories", Name = "Equip", Icon = "shield" })
+local Travel = Window:AddTab({ Section = "Navigation", Name = "Travel", Icon = "pin" })
 
 local General = Farming:AddSection({ Title = "General", Desc = "Main toggles for this tab." })
 General:AddToggle({
