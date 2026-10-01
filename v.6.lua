@@ -1457,7 +1457,7 @@ end
 ------------------------------------------------------------------
 local Window = MacUI.CreateWindow({
 	Title = "Nyx Hub",
-	Subtitle = "version 1.6",
+	Subtitle = "version 1.6.1",
     Logo = "rbxassetid://134813417493601",
 	-- Put your logo id INSIDE this table, between the braces, with a comma at the end:
 	-- Theme = "Dark",
