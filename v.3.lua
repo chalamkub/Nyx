@@ -1,5 +1,12 @@
--- MacUI v2 : custom macOS-style UI (Luau). UI only, no game logic.
--- Red = close everything | Yellow = change UI size | Green = hide UI (open with logo button / RightShift)
+-- MacUI v3 : custom macOS-style UI (Luau). UI only, no game logic.
+-- Red    = close script (asks to confirm)
+-- Yellow = change UI size
+-- Green  = hide UI (open again with the logo button or RightShift)
+--
+-- Built-in icons (drawn from shapes, no asset ids needed, they follow the theme color):
+--   sprout, bag, arrow, shield, dumbbell, pin, gear, user, home, sword, search, list
+--   aliases: farming, loadout, movement, equip, training, travel, settings, character, combat
+-- Icon can also be an asset id: "rbxassetid://123" or just "123".
 
 local Players = game:GetService("Players")
 local UIS = game:GetService("UserInputService")
@@ -7,7 +14,6 @@ local TweenService = game:GetService("TweenService")
 
 local MacUI = {}
 
--- Theme presets (Accent is separate)
 local Presets = {
 	Dark = {
 		Window = Color3.fromRGB(30, 33, 40), Sidebar = Color3.fromRGB(37, 41, 50),
@@ -81,14 +87,210 @@ local function isMove(input)
 		or input.UserInputType == Enum.UserInputType.Touch
 end
 
+local function normalizeAsset(id)
+	if id == nil or id == "" then
+		return nil
+	end
+	id = tostring(id)
+	if string.match(id, "^%d+$") then
+		return "rbxassetid://" .. id
+	end
+	return id
+end
+
+----------------------------------------------------------------------
+-- drawn icons (16x16 grid)
+----------------------------------------------------------------------
+local IconDefs = {
+	sprout = function(a)
+		a.line(8, 15, 8, 7.5, 1.6)
+		a.fill(2.2, 4.3, 6, 3.4, 1.7, -30)
+		a.fill(8, 2.6, 6, 3.4, 1.7, 30)
+	end,
+	bag = function(a)
+		a.ring(5, 1.5, 6, 8, 3, 1.5)
+		a.fill(2.5, 6, 11, 8.5, 2.5)
+	end,
+	arrow = function(a)
+		a.line(2.5, 8, 13, 8, 1.7)
+		a.line(13, 8, 8.5, 3.5, 1.7)
+		a.line(13, 8, 8.5, 12.5, 1.7)
+	end,
+	shield = function(a)
+		a.ring(3, 1.5, 10, 12.5, 5, 1.6)
+		a.line(8, 4.5, 8, 10, 1.4)
+	end,
+	dumbbell = function(a)
+		a.line(4.5, 8, 11.5, 8, 1.6)
+		a.fill(2.5, 4.5, 2.2, 7, 1)
+		a.fill(11.3, 4.5, 2.2, 7, 1)
+		a.fill(0.5, 6, 2, 4, 0.8)
+		a.fill(13.5, 6, 2, 4, 0.8)
+	end,
+	pin = function(a)
+		a.ring(4, 1.2, 8, 8, 4, 1.6)
+		a.line(5, 8.3, 8, 14.5, 1.6)
+		a.line(11, 8.3, 8, 14.5, 1.6)
+	end,
+	gear = function(a)
+		a.ring(3.5, 3.5, 9, 9, 4.5, 2.2)
+		a.fill(6.9, 0.8, 2.2, 3, 1)
+		a.fill(6.9, 12.2, 2.2, 3, 1)
+		a.fill(0.8, 6.9, 3, 2.2, 1)
+		a.fill(12.2, 6.9, 3, 2.2, 1)
+	end,
+	user = function(a)
+		a.fill(5, 1.5, 6, 6, 3)
+		a.fill(2.5, 9.5, 11, 9, 5)
+	end,
+	home = function(a)
+		a.line(1.5, 8, 8, 2.5, 1.6)
+		a.line(14.5, 8, 8, 2.5, 1.6)
+		a.ring(3.2, 7.2, 9.6, 7, 1.5, 1.5)
+		a.fill(7, 10.5, 2, 3.7, 0.5)
+	end,
+	sword = function(a)
+		a.line(3, 13, 12.5, 3.5, 1.8)
+		a.line(3.3, 9.3, 6.7, 12.7, 1.6)
+		a.fill(1.8, 12, 2.4, 2.4, 1.2)
+	end,
+	search = function(a)
+		a.ring(2, 2, 9, 9, 4.5, 1.6)
+		a.line(9.5, 9.5, 14, 14, 1.8)
+	end,
+	chevron = function(a)
+		a.line(3.5, 6, 8, 10.5, 1.6)
+		a.line(12.5, 6, 8, 10.5, 1.6)
+	end,
+	list = function(a)
+		a.line(3, 4.5, 13, 4.5, 1.6)
+		a.line(3, 8, 13, 8, 1.6)
+		a.line(3, 11.5, 13, 11.5, 1.6)
+	end,
+}
+local IconAlias = {
+	farming = "sprout", loadout = "bag", backpack = "bag", movement = "arrow", run = "arrow",
+	equip = "shield", training = "dumbbell", travel = "pin", map = "pin", settings = "gear",
+	character = "user", combat = "sword", swords = "sword",
+}
+
+local function resolveIconName(s)
+	s = string.lower(s)
+	if IconDefs[s] then
+		return s
+	end
+	return IconAlias[s]
+end
+
+local function buildIcon(name, parent, size)
+	local s = size or 16
+	local k = s / 16
+	local root = New("Frame", {
+		BackgroundTransparency = 1,
+		Size = UDim2.fromOffset(s, s),
+		ClipsDescendants = true,
+		Parent = parent,
+	})
+	local parts = {}
+	local api = {}
+
+	function api.fill(x, y, w, h, radius, rot)
+		local f = New("Frame", {
+			BorderSizePixel = 0,
+			Position = UDim2.fromOffset(x * k, y * k),
+			Size = UDim2.fromOffset(w * k, h * k),
+			Rotation = rot or 0,
+			Parent = root,
+		}, { Round((radius or 0) * k) })
+		table.insert(parts, { Inst = f, Kind = "fill" })
+	end
+	function api.ring(x, y, w, h, radius, thick)
+		local f = New("Frame", {
+			BackgroundTransparency = 1,
+			BorderSizePixel = 0,
+			Position = UDim2.fromOffset(x * k, y * k),
+			Size = UDim2.fromOffset(w * k, h * k),
+			Parent = root,
+		}, { Round(radius * k) })
+		local st = New("UIStroke", {
+			Thickness = thick * k,
+			ApplyStrokeMode = Enum.ApplyStrokeMode.Border,
+			Parent = f,
+		})
+		table.insert(parts, { Inst = st, Kind = "stroke" })
+	end
+	function api.line(x1, y1, x2, y2, t)
+		local dx, dy = x2 - x1, y2 - y1
+		local len = math.sqrt(dx * dx + dy * dy)
+		local f = New("Frame", {
+			BorderSizePixel = 0,
+			AnchorPoint = Vector2.new(0.5, 0.5),
+			Position = UDim2.fromOffset((x1 + x2) / 2 * k, (y1 + y2) / 2 * k),
+			Size = UDim2.fromOffset(len * k, t * k),
+			Rotation = math.deg(math.atan2(dy, dx)),
+			Parent = root,
+		}, { Round(t * k / 2) })
+		table.insert(parts, { Inst = f, Kind = "fill" })
+	end
+
+	IconDefs[name](api)
+	return { Root = root, Parts = parts, Kind = "drawn" }
+end
+
+local function makeIcon(parent, icon, size)
+	size = size or 16
+	local name = resolveIconName(icon)
+	if name then
+		return buildIcon(name, parent, size)
+	end
+	local img = normalizeAsset(icon)
+	if string.find(img, "rbxasset") or string.find(img, "http") then
+		return {
+			Kind = "image",
+			Root = New("ImageLabel", {
+				BackgroundTransparency = 1,
+				Image = img,
+				Size = UDim2.fromOffset(size, size),
+				Parent = parent,
+			}),
+		}
+	end
+	return {
+		Kind = "text",
+		Root = New("TextLabel", {
+			BackgroundTransparency = 1,
+			Text = icon,
+			Font = Enum.Font.Gotham,
+			TextSize = size - 2,
+			Size = UDim2.fromOffset(size, size),
+			Parent = parent,
+		}),
+	}
+end
+
+local function tintIcon(ic, color)
+	if ic.Kind == "drawn" then
+		for _, p in ipairs(ic.Parts) do
+			if p.Kind == "fill" then
+				p.Inst.BackgroundColor3 = color
+			else
+				p.Inst.Color = color
+			end
+		end
+	elseif ic.Kind == "image" then
+		ic.Root.ImageColor3 = color
+	else
+		ic.Root.TextColor3 = color
+	end
+end
+
+----------------------------------------------------------------------
 function MacUI.CreateWindow(opts)
 	opts = opts or {}
 	local WIDTH, HEIGHT, SIDE = 560, 370, 150
 	local conns = {}
 
-	----------------------------------------------------------------
 	-- theme system
-	----------------------------------------------------------------
 	local Theme = {}
 	local hooks = {}
 
@@ -120,6 +322,13 @@ function MacUI.CreateWindow(opts)
 		table.insert(hooks, h)
 		return inst
 	end
+	local function themedIcon(ic, key)
+		local function h()
+			tintIcon(ic, Theme[key])
+		end
+		h()
+		table.insert(hooks, h)
+	end
 	local function Stroke(key)
 		return themed(New("UIStroke", {
 			Thickness = 1,
@@ -140,9 +349,7 @@ function MacUI.CreateWindow(opts)
 		return themed(New("TextLabel", base), { TextColor3 = key or "Text" })
 	end
 
-	----------------------------------------------------------------
 	-- gui root
-	----------------------------------------------------------------
 	local gui = New("ScreenGui", {
 		Name = "MacUI",
 		ResetOnSpawn = false,
@@ -189,9 +396,7 @@ function MacUI.CreateWindow(opts)
 		end
 	end
 
-	----------------------------------------------------------------
 	-- sidebar
-	----------------------------------------------------------------
 	local sidebar = themed(New("Frame", {
 		Size = UDim2.new(0, SIDE, 1, 0),
 		BorderSizePixel = 0,
@@ -228,7 +433,7 @@ function MacUI.CreateWindow(opts)
 		}),
 	})
 
-	-- traffic lights (with hover symbols like macOS)
+	-- traffic lights
 	local lights = {}
 	local function light(x, color, glyph)
 		local b = New("TextButton", {
@@ -262,20 +467,19 @@ function MacUI.CreateWindow(opts)
 		end)
 	end
 
-	----------------------------------------------------------------
 	-- top bar
-	----------------------------------------------------------------
 	local topbar = New("Frame", {
 		Position = UDim2.new(0, SIDE, 0, 0),
 		Size = UDim2.new(1, -SIDE, 0, 44),
 		BackgroundTransparency = 1,
 		Parent = main,
 	})
+	local logoId = normalizeAsset(opts.Logo)
 	local textX = 16
-	if opts.Logo then
+	if logoId then
 		New("ImageLabel", {
 			BackgroundTransparency = 1,
-			Image = opts.Logo,
+			Image = logoId,
 			ScaleType = Enum.ScaleType.Fit,
 			Position = UDim2.fromOffset(14, 8),
 			Size = UDim2.fromOffset(28, 28),
@@ -312,9 +516,14 @@ function MacUI.CreateWindow(opts)
 		Size = UDim2.fromOffset(150, 26),
 		BorderSizePixel = 0,
 		Parent = topbar,
-	}, { Round(6), New("UIPadding", { PaddingLeft = UDim.new(0, 10), PaddingRight = UDim.new(0, 10) }) }), {
+	}, { Round(6), New("UIPadding", { PaddingLeft = UDim.new(0, 28), PaddingRight = UDim.new(0, 8) }) }), {
 		BackgroundColor3 = "Field", TextColor3 = "Text", PlaceholderColor3 = "SubText",
 	})
+	do
+		local si = buildIcon("search", searchBox, 14)
+		si.Root.Position = UDim2.fromOffset(-20, 6)
+		themedIcon(si, "SubText")
+	end
 
 	local pages = New("Frame", {
 		Position = UDim2.new(0, SIDE, 0, 44),
@@ -322,43 +531,61 @@ function MacUI.CreateWindow(opts)
 		BackgroundTransparency = 1,
 		Parent = main,
 	})
+	local noResults = Label({
+		Text = "No results",
+		TextXAlignment = Enum.TextXAlignment.Center,
+		Size = UDim2.fromScale(1, 1),
+		Visible = false,
+		Parent = pages,
+	}, "SubText")
 
-	----------------------------------------------------------------
-	-- open button (logo only, no background)
-	----------------------------------------------------------------
-	local openBtn
-	if opts.Logo then
-		openBtn = New("ImageButton", {
-			Image = opts.Logo,
-			ScaleType = Enum.ScaleType.Fit,
+	-- open button: logo only, no background (fallback letter if the image fails to load)
+	local openBtn = New("TextButton", {
+		Name = "OpenButton",
+		Text = "",
+		AutoButtonColor = false,
+		BackgroundTransparency = 1,
+		BorderSizePixel = 0,
+		Position = UDim2.new(0, 16, 0.5, -26),
+		Size = UDim2.fromOffset(52, 52),
+		Parent = gui,
+	})
+	local fallback = themed(New("TextLabel", {
+		Text = string.upper(string.sub(opts.Title or "M", 1, 1)),
+		Font = Enum.Font.GothamBold,
+		TextSize = 22,
+		TextColor3 = Color3.new(1, 1, 1),
+		BorderSizePixel = 0,
+		Size = UDim2.fromScale(1, 1),
+		Visible = (logoId == nil),
+		Parent = openBtn,
+	}, { Round(14) }), { BackgroundColor3 = "Accent" })
+	if logoId then
+		local img = New("ImageLabel", {
 			BackgroundTransparency = 1,
-			BorderSizePixel = 0,
-			AutoButtonColor = false,
-			Position = UDim2.new(0, 16, 0.5, -26),
-			Size = UDim2.fromOffset(52, 52),
-			Parent = gui,
+			Image = logoId,
+			ScaleType = Enum.ScaleType.Fit,
+			Size = UDim2.fromScale(1, 1),
+			Parent = openBtn,
 		})
-	else
-		openBtn = themed(New("TextButton", {
-			Text = string.upper(string.sub(opts.Title or "M", 1, 1)),
-			Font = Enum.Font.GothamBold,
-			TextSize = 22,
-			TextColor3 = Color3.new(1, 1, 1),
-			AutoButtonColor = false,
-			BorderSizePixel = 0,
-			Position = UDim2.new(0, 16, 0.5, -26),
-			Size = UDim2.fromOffset(52, 52),
-			Parent = gui,
-		}, { Round(14) }), { BackgroundColor3 = "Accent" })
+		img:GetPropertyChangedSignal("IsLoaded"):Connect(function()
+			if img.IsLoaded then
+				fallback.Visible = false
+			end
+		end)
+		task.delay(5, function()
+			if img.Parent and not img.IsLoaded then
+				fallback.Visible = true
+				warn("[MacUI] Logo did not load, check the image id: " .. tostring(opts.Logo))
+			end
+		end)
 	end
 
 	local function toggleMain()
 		main.Visible = not main.Visible
 	end
 
-	----------------------------------------------------------------
 	-- dragging (window, open button, sliders)
-	----------------------------------------------------------------
 	local dragging, dragStart, startPos = false, nil, nil
 	local btnDrag = nil
 	local activeSlider = nil
@@ -417,21 +644,131 @@ function MacUI.CreateWindow(opts)
 		end
 	end))
 
+	-- close confirmation dialog
+	local confirm = New("TextButton", {
+		Text = "",
+		AutoButtonColor = false,
+		BackgroundColor3 = Color3.new(0, 0, 0),
+		BackgroundTransparency = 0.45,
+		BorderSizePixel = 0,
+		Size = UDim2.fromScale(1, 1),
+		Visible = false,
+		ZIndex = 100,
+		Parent = main,
+	}, { Round(12) })
+	local dlg = themed(New("Frame", {
+		AnchorPoint = Vector2.new(0.5, 0.5),
+		Position = UDim2.fromScale(0.5, 0.5),
+		Size = UDim2.fromOffset(280, 150),
+		BorderSizePixel = 0,
+		Parent = confirm,
+	}, { Round(12), Stroke("Stroke") }), { BackgroundColor3 = "Card" })
+	Label({
+		Text = "Close script?",
+		Font = Enum.Font.GothamBold,
+		TextSize = 15,
+		Position = UDim2.fromOffset(20, 16),
+		Size = UDim2.new(1, -40, 0, 20),
+		Parent = dlg,
+	}, "Text")
+	Label({
+		Text = "This turns off everything and removes the UI. You will need to run the script again to use it.",
+		TextSize = 12,
+		TextWrapped = true,
+		TextYAlignment = Enum.TextYAlignment.Top,
+		Position = UDim2.fromOffset(20, 42),
+		Size = UDim2.new(1, -40, 0, 50),
+		Parent = dlg,
+	}, "SubText")
+	local cancelBtn = themed(New("TextButton", {
+		Text = "Cancel",
+		Font = Enum.Font.GothamMedium,
+		TextSize = 13,
+		AutoButtonColor = false,
+		Position = UDim2.fromOffset(20, 104),
+		Size = UDim2.fromOffset(115, 30),
+		BorderSizePixel = 0,
+		Parent = dlg,
+	}, { Round(7), Stroke("Stroke") }), { BackgroundColor3 = "Field", TextColor3 = "Text" })
+	local closeBtn = New("TextButton", {
+		Text = "Close",
+		Font = Enum.Font.GothamMedium,
+		TextSize = 13,
+		TextColor3 = Color3.new(1, 1, 1),
+		AutoButtonColor = false,
+		BackgroundColor3 = Color3.fromRGB(255, 95, 87),
+		Position = UDim2.fromOffset(145, 104),
+		Size = UDim2.fromOffset(115, 30),
+		BorderSizePixel = 0,
+		Parent = dlg,
+	}, { Round(7) })
+
 	----------------------------------------------------------------
-	-- tabs
+	-- tabs, groups, search
 	----------------------------------------------------------------
 	local Window = {}
 	local currentTab
 	local order = 0
-	local seenSections = {}
+	local tabsList = {}
+	local groups, groupList = {}, {}
 
 	local function applyFilter()
-		if not currentTab then
+		local q = string.lower(searchBox.Text)
+		q = string.gsub(q, "^%s+", "")
+		q = string.gsub(q, "%s+$", "")
+		local firstMatch
+		for _, tab in ipairs(tabsList) do
+			local any = false
+			for _, sec in ipairs(tab._sections) do
+				local secAny = false
+				for _, r in ipairs(sec.Rows) do
+					local m = (q == "") or (string.find(r.Key, q, 1, true) ~= nil)
+					r.Frame.Visible = m
+					if m then
+						secAny = true
+					end
+				end
+				sec.Holder.Visible = (q == "") or secAny
+				if secAny then
+					any = true
+				end
+			end
+			tab.HasMatch = any
+			tab.Button.Visible = (q == "") or any
+			if any and not firstMatch then
+				firstMatch = tab
+			end
+		end
+
+		local seenShown = false
+		for _, g in ipairs(groupList) do
+			local shown = false
+			for _, t in ipairs(g.Tabs) do
+				if t.Button.Visible then
+					shown = true
+				end
+			end
+			g.Label.Visible = shown
+			if g.Divider then
+				g.Divider.Visible = shown and seenShown
+			end
+			if shown then
+				seenShown = true
+			end
+		end
+
+		if q ~= "" and not firstMatch then
+			noResults.Visible = true
+			if currentTab then
+				currentTab.Page.Visible = false
+			end
 			return
 		end
-		local q = string.lower(searchBox.Text)
-		for _, r in ipairs(currentTab._rows) do
-			r.Frame.Visible = (q == "" or string.find(r.Key, q, 1, true) ~= nil)
+		noResults.Visible = false
+		if q ~= "" and currentTab and not currentTab.HasMatch and firstMatch then
+			Window._select(firstMatch, true)
+		elseif currentTab then
+			currentTab.Page.Visible = true
 		end
 	end
 	searchBox:GetPropertyChangedSignal("Text"):Connect(applyFilter)
@@ -441,19 +778,16 @@ function MacUI.CreateWindow(opts)
 		tab.Button.BackgroundColor3 = Theme.Selected
 		local c = selected and Theme.SelectedText or Theme.SubText
 		tab.Text.TextColor3 = c
+		tab.Bar.Visible = selected
 		if tab.Icon and not tab.NoTint then
-			if tab.Icon:IsA("ImageLabel") then
-				tab.Icon.ImageColor3 = c
-			else
-				tab.Icon.TextColor3 = c
-			end
+			tintIcon(tab.Icon, c)
 		end
 	end
 
-	local function selectTab(tab)
+	local function selectTab(tab, skipFilter)
 		local old = currentTab
 		currentTab = tab
-		if old then
+		if old and old ~= tab then
 			old.Page.Visible = false
 			tween(old.Button, { BackgroundTransparency = 1 })
 			styleTab(old)
@@ -461,8 +795,11 @@ function MacUI.CreateWindow(opts)
 		tab.Page.Visible = true
 		tween(tab.Button, { BackgroundTransparency = 0 })
 		styleTab(tab)
-		applyFilter()
+		if not skipFilter then
+			applyFilter()
+		end
 	end
+	Window._select = selectTab
 
 	local function makeSection(tab, o)
 		o = o or {}
@@ -476,6 +813,8 @@ function MacUI.CreateWindow(opts)
 			LayoutOrder = tab._order,
 			Parent = tab.Page,
 		}, { New("UIListLayout", { Padding = UDim.new(0, 4), SortOrder = Enum.SortOrder.LayoutOrder }) })
+		local secEntry = { Holder = holder, Rows = {} }
+		table.insert(tab._sections, secEntry)
 
 		if o.Title then
 			Label({
@@ -545,9 +884,11 @@ function MacUI.CreateWindow(opts)
 				Size = UDim2.new(1, -200, 0, 16),
 				Parent = row,
 			}, "SubText")
-			table.insert(tab._rows, {
+			table.insert(secEntry.Rows, {
 				Frame = row,
-				Key = string.lower((title or "") .. " " .. (desc or "")),
+				Key = string.lower(table.concat({
+					tab.Name or "", o.Title or "", o.Desc or "", title or "", desc or "",
+				}, " ")),
 			})
 			return row, descLabel
 		end
@@ -620,14 +961,10 @@ function MacUI.CreateWindow(opts)
 				Size = UDim2.new(1, -30, 1, 0),
 				Parent = btn,
 			}, "Text")
-			Label({
-				Text = "▾",
-				TextSize = 13,
-				TextXAlignment = Enum.TextXAlignment.Center,
-				Position = UDim2.new(1, -20, 0, 0),
-				Size = UDim2.fromOffset(16, 26),
-				Parent = btn,
-			}, "SubText")
+			local chev = buildIcon("chevron", btn, 14)
+			chev.Root.AnchorPoint = Vector2.new(1, 0.5)
+			chev.Root.Position = UDim2.new(1, -6, 0.5, 0)
+			themedIcon(chev, "SubText")
 
 			local obj = {}
 			local function set(v, silent)
@@ -828,46 +1165,34 @@ function MacUI.CreateWindow(opts)
 		return Section
 	end
 
-	-- Icon can be: an emoji/symbol ("🌾"), an asset id ("rbxassetid://123" or "123")
-	local function makeIcon(parent, icon)
-		local img = icon
-		if string.match(icon, "^%d+$") then
-			img = "rbxassetid://134813417493601" .. icon
-		end
-		if string.find(img, "rbxasset") or string.find(img, "http") then
-			return New("ImageLabel", {
-				BackgroundTransparency = 1,
-				Image = img,
-				Position = UDim2.new(0, 10, 0.5, -8),
-				Size = UDim2.fromOffset(16, 16),
-				Parent = parent,
-			})
-		end
-		return New("TextLabel", {
-			BackgroundTransparency = 1,
-			Text = icon,
-			Font = Enum.Font.Gotham,
-			TextSize = 14,
-			TextXAlignment = Enum.TextXAlignment.Center,
-			Position = UDim2.new(0, 8, 0, 0),
-			Size = UDim2.fromOffset(20, 30),
-			Parent = parent,
-		})
-	end
-
 	function Window:AddTab(o)
 		o = o or {}
-		if o.Section and not seenSections[o.Section] then
-			seenSections[o.Section] = true
-			order += 1
-			local secLabel = Label({
-				Text = o.Section,
-				TextSize = 11,
-				Size = UDim2.new(1, 0, 0, 26),
-				LayoutOrder = order,
-				Parent = sideList,
-			}, "SubText")
-			New("UIPadding", { PaddingLeft = UDim.new(0, 8), PaddingTop = UDim.new(0, 6), Parent = secLabel })
+		local group
+		if o.Section then
+			group = groups[o.Section]
+			if not group then
+				group = { Tabs = {} }
+				groups[o.Section] = group
+				if #groupList > 0 then
+					order += 1
+					group.Divider = themed(New("Frame", {
+						Size = UDim2.new(1, 0, 0, 1),
+						BorderSizePixel = 0,
+						LayoutOrder = order,
+						Parent = sideList,
+					}), { BackgroundColor3 = "Stroke" })
+				end
+				order += 1
+				group.Label = Label({
+					Text = o.Section,
+					TextSize = 11,
+					Size = UDim2.new(1, 0, 0, 26),
+					LayoutOrder = order,
+					Parent = sideList,
+				}, "SubText")
+				New("UIPadding", { PaddingLeft = UDim.new(0, 8), PaddingTop = UDim.new(0, 6), Parent = group.Label })
+				table.insert(groupList, group)
+			end
 		end
 
 		order += 1
@@ -882,15 +1207,27 @@ function MacUI.CreateWindow(opts)
 			LayoutOrder = order,
 			Parent = sideList,
 		}, { Round(6) })
-		local icon = o.Icon and makeIcon(btn, o.Icon) or nil
+		local bar = themed(New("Frame", {
+			Position = UDim2.new(0, 3, 0.5, -7),
+			Size = UDim2.fromOffset(3, 14),
+			BorderSizePixel = 0,
+			Visible = false,
+			Parent = btn,
+		}, { Round(2) }), { BackgroundColor3 = "Accent" })
+
+		local icon
+		if o.Icon then
+			icon = makeIcon(btn, o.Icon, 16)
+			icon.Root.Position = UDim2.new(0, 12, 0.5, -8)
+		end
 		local text = New("TextLabel", {
 			BackgroundTransparency = 1,
 			Text = o.Name,
 			Font = Enum.Font.Gotham,
 			TextSize = 13,
 			TextXAlignment = Enum.TextXAlignment.Left,
-			Position = UDim2.new(0, icon and 34 or 12, 0, 0),
-			Size = UDim2.new(1, -40, 1, 0),
+			Position = UDim2.new(0, icon and 36 or 14, 0, 0),
+			Size = UDim2.new(1, -42, 1, 0),
 			Parent = btn,
 		})
 
@@ -914,11 +1251,15 @@ function MacUI.CreateWindow(opts)
 		themed(page, { ScrollBarImageColor3 = "Off" })
 
 		local Tab = {
-			Button = btn, Text = text, Icon = icon, NoTint = o.NoTint,
-			Page = page, _rows = {}, _order = 0,
+			Name = o.Name, Button = btn, Text = text, Icon = icon, Bar = bar, NoTint = o.NoTint,
+			Page = page, _sections = {}, _order = 0, HasMatch = true,
 		}
 		function Tab:AddSection(so)
 			return makeSection(Tab, so)
+		end
+		table.insert(tabsList, Tab)
+		if group then
+			table.insert(group.Tabs, Tab)
 		end
 		table.insert(hooks, function()
 			styleTab(Tab)
@@ -935,9 +1276,7 @@ function MacUI.CreateWindow(opts)
 		return Tab
 	end
 
-	----------------------------------------------------------------
-	-- built-in settings tab (theme, accent, size)
-	----------------------------------------------------------------
+	-- settings tab (theme, accent, size)
 	function Window:SetTheme(name)
 		if Presets[name] then
 			loadPreset(name)
@@ -959,7 +1298,7 @@ function MacUI.CreateWindow(opts)
 		local tab = Window:AddTab({
 			Section = o.Section or "Settings",
 			Name = o.Name or "Settings",
-			Icon = o.Icon or "⚙",
+			Icon = o.Icon or "gear",
 		})
 
 		local look = tab:AddSection({ Title = "Appearance", Desc = "Change the UI color tone." })
@@ -1013,30 +1352,13 @@ function MacUI.CreateWindow(opts)
 			Desc = "Same as the red button.",
 			ButtonText = "Unload",
 			Callback = function()
-				Window:Destroy()
+				Window:ConfirmClose()
 			end,
 		})
 		return tab
 	end
 
-	----------------------------------------------------------------
-	-- traffic light actions
-	----------------------------------------------------------------
-	local SIZE_STEPS = { 0.75, 1, 1.25 }
-	yellow.MouseButton1Click:Connect(function()
-		local nextScale
-		for _, s in ipairs(SIZE_STEPS) do
-			if s > currentScale + 0.01 then
-				nextScale = s
-				break
-			end
-		end
-		setScale(nextScale or SIZE_STEPS[1])
-	end)
-	green.MouseButton1Click:Connect(function()
-		main.Visible = false
-	end)
-
+	-- window controls
 	local destroyed = false
 	function Window:Destroy()
 		if destroyed then
@@ -1051,11 +1373,42 @@ function MacUI.CreateWindow(opts)
 			task.spawn(opts.OnDestroy)
 		end
 	end
+	function Window:ConfirmClose()
+		if opts.ConfirmClose == false then
+			Window:Destroy()
+		else
+			main.Visible = true
+			confirm.Visible = true
+		end
+	end
 	function Window:Toggle()
 		toggleMain()
 	end
+
 	red.MouseButton1Click:Connect(function()
+		Window:ConfirmClose()
+	end)
+	cancelBtn.MouseButton1Click:Connect(function()
+		confirm.Visible = false
+	end)
+	closeBtn.MouseButton1Click:Connect(function()
 		Window:Destroy()
+	end)
+
+	local SIZE_STEPS = { 0.75, 1, 1.25 }
+	yellow.MouseButton1Click:Connect(function()
+		local nextScale
+		for _, s in ipairs(SIZE_STEPS) do
+			if s > currentScale + 0.01 then
+				nextScale = s
+				break
+			end
+		end
+		setScale(nextScale or SIZE_STEPS[1])
+	end)
+	green.MouseButton1Click:Connect(function()
+		confirm.Visible = false
+		main.Visible = false
 	end)
 
 	local toggleKey = opts.ToggleKey or Enum.KeyCode.RightShift
@@ -1072,18 +1425,19 @@ end
 -- DEMO (replace the print callbacks with your own logic)
 ------------------------------------------------------------------
 local Window = MacUI.CreateWindow({
-	Title = "My Script",
+	Title = "Nyx Hub",
 	Subtitle = "Primary",
-	-- Logo = "rbxassetid://YOUR_IMAGE_ID",   -- upload your logo to Roblox and paste the id here
-	-- Theme = "Dark", Accent = Color3.fromRGB(41, 148, 255),
+    Logo = "rbxassetid://134813417493601",
+	-- Put your logo id INSIDE this table, between the braces, with a comma at the end:
+	-- Theme = "Dark",
 	-- OnDestroy = function() print("script unloaded") end,
 })
 
-local Farming = Window:AddTab({ Section = "Auto Farm", Name = "Farming", Icon = "🌾" })
-local Loadout = Window:AddTab({ Section = "Combat", Name = "Loadout", Icon = "🎒" })
-local Movement = Window:AddTab({ Section = "Character", Name = "Movement", Icon = "🏃" })
-local Equip = Window:AddTab({ Section = "Accessories", Name = "Equip", Icon = "🛡" })
-local Travel = Window:AddTab({ Section = "Navigation", Name = "Travel", Icon = "🗺" })
+local Farming = Window:AddTab({ Section = "Auto Farm", Name = "Farming", Icon = "sprout" })
+local Loadout = Window:AddTab({ Section = "Combat", Name = "Loadout", Icon = "bag" })
+local Movement = Window:AddTab({ Section = "Character", Name = "Movement", Icon = "arrow" })
+local Equip = Window:AddTab({ Section = "Accessories", Name = "Equip", Icon = "shield" })
+local Travel = Window:AddTab({ Section = "Navigation", Name = "Travel", Icon = "pin" })
 
 local General = Farming:AddSection({ Title = "General", Desc = "Main toggles for this tab." })
 General:AddToggle({
