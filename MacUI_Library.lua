@@ -27,8 +27,11 @@
 -- Built-in drawn icons: sprout, bag, arrow, shield, dumbbell, pin, gear, user, home, sword, search, list,
 --   sidebar, left, right, updown, lock, star, bolt, eye, folder
 -- Header: [sidebar toggle] [< back] [> forward] Title / Subtitle. (< > use built-in image ids; override with Icons = { Back = "id", Forward = "id" })
---   Back/forward walk through the tabs you visited.
+--   < and > go to the previous / next tab. At the first tab only > shows, at the last tab only < shows.
 --   Window:ToggleSidebar() collapses / expands the sidebar.
+-- Profile (bottom of the sidebar): avatar + name of the local player. Options in CreateWindow:
+--   ShowUser = true, UserName = "text", UserId = 123, UserImage = "rbxassetid://...", MaskName = false (true -> "iM*****")
+--   Window:SetUser({ Name = "text", UserId = 123, Image = "id", Mask = true })
 -- Section icons: Tab:AddSection({ Title = "Bosses", Desc = "...", Icon = "star", IconColor = Color3.fromRGB(255, 82, 82) })
 --   Icon can be a built-in name, an image id, or an emoji (emoji keep their own colors).
 -- Icon values may also be an image id: "123" / "rbxassetid://123" / { Id = "123", Tint = false, Recolor = false }
@@ -528,6 +531,7 @@ function MacUI.CreateWindow(opts)
 	opts = opts or {}
 	registerIcons(opts.Icons)
 	local WIDTH, HEIGHT, SIDE = 560, 370, 150
+	local PROFILE_H = (opts.ShowUser ~= false) and 54 or 0
 	local conns = {}
 
 	-- theme system
@@ -685,7 +689,7 @@ function MacUI.CreateWindow(opts)
 
 	local sideList = New("ScrollingFrame", {
 		Position = UDim2.new(0, 0, 0, 45),
-		Size = UDim2.new(0, SIDE - 1, 1, -45),
+		Size = UDim2.new(0, SIDE - 1, 1, -45 - PROFILE_H),
 		BackgroundTransparency = 1,
 		BorderSizePixel = 0,
 		ScrollBarThickness = 0,
@@ -700,6 +704,80 @@ function MacUI.CreateWindow(opts)
 			PaddingBottom = UDim.new(0, 8),
 		}),
 	})
+
+	-- profile: avatar + name at the bottom of the sidebar
+	local applyUser = function() end
+	local userInfo = { Name = opts.UserName, UserId = opts.UserId, Image = opts.UserImage, Mask = opts.MaskName }
+	if PROFILE_H > 0 then
+		themed(New("Frame", {
+			Name = "ProfileLine",
+			Position = UDim2.new(0, 8, 1, -PROFILE_H),
+			Size = UDim2.new(0, SIDE - 17, 0, 1),
+			BorderSizePixel = 0,
+			Parent = sideClip,
+		}), { BackgroundColor3 = "Stroke" })
+		local avatar = themed(New("Frame", {
+			Name = "Avatar",
+			AnchorPoint = Vector2.new(0, 0.5),
+			Position = UDim2.new(0, 12, 1, -PROFILE_H / 2),
+			Size = UDim2.fromOffset(32, 32),
+			BorderSizePixel = 0,
+			Parent = sideClip,
+		}, { Round(16) }), { BackgroundColor3 = "Field" })
+		local letter = Label({
+			Text = "?",
+			Font = Enum.Font.GothamBold,
+			TextSize = 14,
+			TextXAlignment = Enum.TextXAlignment.Center,
+			Size = UDim2.fromScale(1, 1),
+			Parent = avatar,
+		}, "SubText")
+		local avatarImg = New("ImageLabel", {
+			BackgroundTransparency = 1,
+			BorderSizePixel = 0,
+			ScaleType = Enum.ScaleType.Crop,
+			Size = UDim2.fromScale(1, 1),
+			Parent = avatar,
+		}, { Round(16) })
+		local nameLabel = Label({
+			Text = "",
+			Font = Enum.Font.GothamMedium,
+			TextSize = 13,
+			TextTruncate = Enum.TextTruncate.AtEnd,
+			AnchorPoint = Vector2.new(0, 0.5),
+			Position = UDim2.new(0, 52, 1, -PROFILE_H / 2),
+			Size = UDim2.fromOffset(SIDE - 52 - 10, 18),
+			Parent = sideClip,
+		}, "Text")
+		avatarImg:GetPropertyChangedSignal("IsLoaded"):Connect(function()
+			if avatarImg.IsLoaded and avatarImg.Image ~= "" then
+				letter.Visible = false
+			end
+		end)
+		applyUser = function()
+			local lp = Players.LocalPlayer
+			local shown = userInfo.Name
+			if (shown == nil or shown == "" or shown == false) and lp then
+				shown = (lp.DisplayName ~= "" and lp.DisplayName) or lp.Name
+			end
+			shown = tostring(shown or "Player")
+			nameLabel.Text = userInfo.Mask and (string.sub(shown, 1, 2) .. "*****") or shown
+			letter.Text = string.upper(string.sub(shown, 1, 1))
+			local img = userInfo.Image and normalizeAsset(userInfo.Image)
+			if not img then
+				local uid = tonumber(userInfo.UserId) or (lp and lp.UserId)
+				if uid and uid > 0 then
+					img = "rbxthumb://type=AvatarHeadShot&id=" .. uid .. "&w=150&h=150"
+				end
+			end
+			letter.Visible = true
+			avatarImg.Image = img or ""
+			if img and avatarImg.IsLoaded then
+				letter.Visible = false
+			end
+		end
+		applyUser()
+	end
 
 	-- drag strip next to the traffic lights (the lights themselves never start a drag)
 	local dragStrip = New("Frame", {
@@ -763,8 +841,7 @@ function MacUI.CreateWindow(opts)
 		Parent = main,
 	})
 	local noDrag = {} -- header controls that must not start a window drag
-	local history, histIdx = {}, 0
-	local navSelect, onToggleSidebar -- assigned further down
+	local onToggleSidebar, navStep, updateNav -- assigned further down
 	local headLeft = New("Frame", {
 		Name = "HeadLeft",
 		BackgroundTransparency = 1,
@@ -828,33 +905,33 @@ function MacUI.CreateWindow(opts)
 				enabled = v
 				paint()
 			end,
+			SetVisible = function(v)
+				hit.Visible = v
+				if not v then
+					hover = false
+					paint()
+				end
+			end,
 		}
 	end
 	local backBtn, fwdBtn
-	local function updateNav()
-		backBtn.SetEnabled(histIdx > 1)
-		fwdBtn.SetEnabled(histIdx < #history)
-	end
 	navButton(14, "Sidebar", "sidebar", function()
 		if onToggleSidebar then
 			onToggleSidebar()
 		end
 	end)
 	backBtn = navButton(36, "Back", "left", function()
-		if histIdx > 1 then
-			histIdx -= 1
-			navSelect(history[histIdx], false, true)
-			updateNav()
+		if navStep then
+			navStep(-1)
 		end
 	end)
 	fwdBtn = navButton(57, "Forward", "right", function()
-		if histIdx < #history then
-			histIdx += 1
-			navSelect(history[histIdx], false, true)
-			updateNav()
+		if navStep then
+			navStep(1)
 		end
 	end)
-	updateNav()
+	backBtn.SetVisible(false)
+	fwdBtn.SetVisible(false)
 
 	Label({
 		Text = opts.Title or "My Script",
@@ -1022,7 +1099,7 @@ function MacUI.CreateWindow(opts)
 	local function overSearch(pos)
 		for _, f in ipairs(noDrag) do
 			local a, sz = f.AbsolutePosition, f.AbsoluteSize
-			if pos.X >= a.X and pos.X <= a.X + sz.X and pos.Y >= a.Y and pos.Y <= a.Y + sz.Y then
+			if f.Visible and pos.X >= a.X and pos.X <= a.X + sz.X and pos.Y >= a.Y and pos.Y <= a.Y + sz.Y then
 				return true
 			end
 		end
@@ -1199,6 +1276,7 @@ function MacUI.CreateWindow(opts)
 			end
 		end
 
+		updateNav()
 		if q ~= "" and not firstMatch then
 			noResults.Visible = true
 			if currentTab then
@@ -1208,7 +1286,7 @@ function MacUI.CreateWindow(opts)
 		end
 		noResults.Visible = false
 		if q ~= "" and currentTab and not currentTab.HasMatch and firstMatch then
-			Window._select(firstMatch, true, true)
+			Window._select(firstMatch, true)
 		elseif currentTab then
 			currentTab.Page.Visible = true
 		end
@@ -1230,16 +1308,8 @@ function MacUI.CreateWindow(opts)
 		end
 	end
 
-	local function selectTab(tab, skipFilter, noHistory)
+	local function selectTab(tab, skipFilter)
 		local old = currentTab
-		if not noHistory and old ~= tab then
-			for i = #history, histIdx + 1, -1 do
-				history[i] = nil
-			end
-			table.insert(history, tab)
-			histIdx = #history
-			updateNav()
-		end
 		currentTab = tab
 		if old and old ~= tab then
 			old.Page.Visible = false
@@ -1252,9 +1322,41 @@ function MacUI.CreateWindow(opts)
 		if not skipFilter then
 			applyFilter()
 		end
+		updateNav()
 	end
 	Window._select = selectTab
-	navSelect = selectTab
+
+	-- < / > : previous / next visible tab (only one arrow at the first and the last tab)
+	local function navList()
+		local list = {}
+		for _, t in ipairs(tabsList) do
+			if t.Button.Visible then
+				table.insert(list, t)
+			end
+		end
+		return list
+	end
+	local function navIndex(list)
+		for i, t in ipairs(list) do
+			if t == currentTab then
+				return i
+			end
+		end
+		return nil
+	end
+	updateNav = function()
+		local list = navList()
+		local i = navIndex(list)
+		backBtn.SetVisible(i ~= nil and i > 1)
+		fwdBtn.SetVisible(i ~= nil and i < #list)
+	end
+	navStep = function(dir)
+		local list = navList()
+		local i = navIndex(list)
+		if i and list[i + dir] then
+			selectTab(list[i + dir])
+		end
+	end
 
 	-- Re-applies the current tab once the layout has settled (same effect as clicking another tab and
 	-- coming back), so the first tab is usable right when the window opens. Calls are batched.
@@ -1271,10 +1373,10 @@ function MacUI.CreateWindow(opts)
 			if my ~= refreshToken or not gui.Parent or not currentTab then
 				return
 			end
-			selectTab(currentTab, false, true)
+			selectTab(currentTab, false)
 			task.wait(0.25)
 			if my == refreshToken and gui.Parent and currentTab then
-				selectTab(currentTab, false, true)
+				selectTab(currentTab, false)
 			end
 		end)
 	end
@@ -1802,6 +1904,7 @@ function MacUI.CreateWindow(opts)
 		else
 			styleTab(Tab)
 		end
+		updateNav()
 		refreshCurrent()
 		return Tab
 	end
@@ -1968,6 +2071,12 @@ function MacUI.CreateWindow(opts)
 	end
 	function Window:Toggle()
 		toggleMain()
+	end
+	function Window:SetUser(t)
+		for k, v in pairs(t or {}) do
+			userInfo[k] = v
+		end
+		applyUser()
 	end
 	function Window:ToggleSidebar()
 		onToggleSidebar()
