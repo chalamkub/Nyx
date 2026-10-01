@@ -626,8 +626,8 @@ function MacUI.CreateWindow(opts)
 	}), { BackgroundColor3 = "Stroke" })
 
 	local sideList = New("ScrollingFrame", {
-		Position = UDim2.new(0, 0, 0, 44),
-		Size = UDim2.new(1, -1, 1, -44),
+		Position = UDim2.new(0, 0, 0, 45),
+		Size = UDim2.new(1, -1, 1, -45),
 		BackgroundTransparency = 1,
 		BorderSizePixel = 0,
 		ScrollBarThickness = 0,
@@ -721,6 +721,16 @@ function MacUI.CreateWindow(opts)
 		Parent = topbar,
 	}, "SubText")
 
+	-- divider between the header (title / subtitle / search) and the content
+	themed(New("Frame", {
+		Name = "HeaderLine",
+		Position = UDim2.fromOffset(0, 44),
+		Size = UDim2.new(1, 0, 0, 1),
+		BorderSizePixel = 0,
+		ZIndex = 5,
+		Parent = main,
+	}), { BackgroundColor3 = "Stroke" })
+
 	-- search: frame holds icon + text box + clear button; the text is clipped inside the frame
 	local searchFrame = themed(New("Frame", {
 		AnchorPoint = Vector2.new(1, 0.5),
@@ -775,8 +785,8 @@ function MacUI.CreateWindow(opts)
 	end)
 
 	local pages = New("Frame", {
-		Position = UDim2.new(0, SIDE, 0, 44),
-		Size = UDim2.new(1, -SIDE, 1, -44),
+		Position = UDim2.new(0, SIDE, 0, 45),
+		Size = UDim2.new(1, -SIDE, 1, -45),
 		BackgroundTransparency = 1,
 		Parent = main,
 	})
@@ -1531,7 +1541,7 @@ function MacUI.CreateWindow(opts)
 		}, {
 			New("UIListLayout", { Padding = UDim.new(0, 14), SortOrder = Enum.SortOrder.LayoutOrder }),
 			New("UIPadding", {
-				PaddingTop = UDim.new(0, 6), PaddingBottom = UDim.new(0, 14),
+				PaddingTop = UDim.new(0, 12), PaddingBottom = UDim.new(0, 14),
 				PaddingLeft = UDim.new(0, 14), PaddingRight = UDim.new(0, 14),
 			}),
 		})
