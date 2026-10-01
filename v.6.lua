@@ -106,10 +106,10 @@ end
 -- แนะนำ Texture สีขาว + พื้นหลังโปร่งใส เพื่อให้เปลี่ยนสีตาม Theme ได้
 ----------------------------------------------------------------------
 local IconTextures = {
-	Farming  = nil, -- "123456789"
-	Loadout  = nil, -- "123456789"
+	Farming  = "119764640250310", -- "123456789"
+	Loadout  = "119764640250310", -- "123456789"
 	Movement = nil, -- "123456789"
-	Equip    = "119764640250310", -- "123456789"
+	Equip    = nil, -- "123456789"
 	Training = nil, -- "123456789"
 	Travel   = nil, -- "123456789"
 	Settings = nil, -- "123456789"
@@ -117,45 +117,15 @@ local IconTextures = {
 	Home     = nil, -- "123456789"
 	Combat   = nil, -- "123456789"
 	Search   = nil, -- "123456789"
-	List     = "90930617752169", -- "123456789"
+	List     = nil, -- "123456789"
 	Chevron  = nil, -- "123456789"
 }
 
-local IconTextureKeys = {
-	sprout = "Farming", farming = "Farming",
-	bag = "Loadout", loadout = "Loadout", backpack = "Loadout",
-	arrow = "Movement", movement = "Movement", run = "Movement",
-	shield = "Equip", equip = "Equip",
-	dumbbell = "Training", training = "Training",
-	pin = "Travel", travel = "Travel", map = "Travel",
-	gear = "Settings", settings = "Settings",
-	user = "Character", character = "Character",
-	home = "Home",
-	sword = "Combat", combat = "Combat", swords = "Combat",
-	search = "Search",
-	list = "List",
-	chevron = "Chevron",
-}
-
-local function getIconTexture(icon)
-	if icon == nil then return nil end
-	local key = tostring(icon)
-
-	local direct = normalizeAsset(key)
-	if direct and (string.find(direct, "rbxasset") or string.find(direct, "http")) then
-		return direct
+local function getIconTexture(name)
+	if not name then
+		return nil
 	end
-
-	if IconTextures[key] then
-		return normalizeAsset(IconTextures[key])
-	end
-
-	local slot = IconTextureKeys[string.lower(key)]
-	if slot and IconTextures[slot] then
-		return normalizeAsset(IconTextures[slot])
-	end
-
-	return nil
+	return IconTextures[name] or IconTextures[string.lower(name)]
 end
 
 -- Returns a texture ID if one was configured for the tab/icon.
@@ -340,15 +310,15 @@ end
 local function makeIcon(parent, icon, size)
 	size = size or 16
 
-	-- Custom Texture ID first.
-	-- Put your IDs in IconTextures near the top of this file.
-	local texture = getIconTexture(icon)
-	if texture then
+	-- Asset/Texture ID has priority.
+	-- This allows the caller to pass either "123456" or "rbxassetid://123456".
+	local img = normalizeAsset(icon)
+	if img and (string.find(img, "rbxasset") or string.find(img, "http")) then
 		local image = New("ImageLabel", {
 			Name = "Icon",
 			BackgroundTransparency = 1,
 			BorderSizePixel = 0,
-			Image = texture,
+			Image = img,
 			ImageColor3 = Color3.fromRGB(255, 255, 255),
 			ImageTransparency = 0,
 			ScaleType = Enum.ScaleType.Fit,
@@ -356,11 +326,14 @@ local function makeIcon(parent, icon, size)
 			Parent = parent,
 		})
 
-		return { Kind = "image", Root = image }
+		return {
+			Kind = "image",
+			Root = image,
+		}
 	end
 
-	-- Built-in fallback if no Texture ID was supplied.
-	local name = type(icon) == "string" and resolveIconName(icon) or nil
+	-- If no texture was supplied, keep the original built-in icon system.
+	local name = resolveIconName(icon)
 	if name then
 		return buildIcon(name, parent, size)
 	end
@@ -370,9 +343,9 @@ local function makeIcon(parent, icon, size)
 		Root = New("TextLabel", {
 			Name = "Icon",
 			BackgroundTransparency = 1,
-			Text = tostring(icon or ""),
+			Text = icon or "",
 			Font = Enum.Font.Gotham,
-			TextSize = math.max(size - 2, 8),
+			TextSize = size - 2,
 			Size = UDim2.fromOffset(size, size),
 			Parent = parent,
 		}),
@@ -1551,7 +1524,7 @@ end
 ------------------------------------------------------------------
 local Window = MacUI.CreateWindow({
 	Title = "Nyx Hub",
-	Subtitle = "version 1.6.5",
+	Subtitle = "version 1.6.5.1",
     Logo = "rbxassetid://134813417493601",
 	-- Put your logo id INSIDE this table, between the braces, with a comma at the end:
 	-- Theme = "Dark",
