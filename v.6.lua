@@ -1467,8 +1467,8 @@ local Window = MacUI.CreateWindow({
 local Farming = Window:AddTab({ Section = "Auto Farm", Name = "Farming", Icon = "sprout" })
 local Loadout = Window:AddTab({ Section = "Combat", Name = "Loadout", Icon = "bag" })
 local Movement = Window:AddTab({ Section = "Character", Name = "Movement", Icon = "arrow" })
-local Equip = Window:AddTab({ Section = "Accessories", Name = "Equip", Icon = "shield" })
-local Travel = Window:AddTab({ Section = "Navigation", Name = "Travel", Icon = "pin" })
+local Equip = Window:AddTab({ Section = "Accessories", Name = "Equip", Icon = "119764640250310" })
+local Travel = Window:AddTab({ Section = "Navigation", Name = "Travel", Icon = "119830582088398" })
 
 local General = Farming:AddSection({ Title = "General", Desc = "Main toggles for this tab." })
 General:AddToggle({
