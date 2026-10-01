@@ -7,11 +7,13 @@
 --   1) Put your Image IDs in the IconTextures table below (by tab name).
 --   2) Anything without an ID falls back to the built-in drawn icon.
 --   Icon IDs must be IMAGE ids (not Decal ids). Use a WHITE icon on a transparent background
---   so it can follow the theme color. If your icons are colored or black, set Tint = false.
+--   so it can follow the theme color. Black icons are recolored to white automatically when the
+--   executor allows it (RECOLOR_ICONS). If your icons are colored, set Tint = false.
 
 local Players = game:GetService("Players")
 local UIS = game:GetService("UserInputService")
 local TweenService = game:GetService("TweenService")
+local AssetService = game:GetService("AssetService")
 
 local MacUI = {}
 
@@ -116,6 +118,14 @@ end
 -- Search / Chevron / Close / List are the small icons used inside the UI.
 ----------------------------------------------------------------------
 local TINT_IMAGE_ICONS = true -- default for icons that do not set Tint themselves
+
+-- Black / dark icons cannot take the theme color (ImageColor3 multiplies: black x any color = black).
+-- With RECOLOR_ICONS = true the script tries to turn the icon pixels white at runtime (keeping the
+-- transparency) so it matches the built-in icons. This needs EditableImage access, which some
+-- executors / assets do not allow. If it fails you get a warning in the console and the icon stays
+-- as uploaded; in that case upload a white version of the icon instead.
+-- Set Recolor = false on a single icon ({ Id = "123", Recolor = false }) or here to turn it off.
+local RECOLOR_ICONS = true
 
 local IconTextures = {
 	Farming   = "119764640250310",
@@ -317,19 +327,68 @@ local function buildIcon(name, parent, size)
 	return { Root = root, Parts = parts, Kind = "drawn" }
 end
 
--- icon can be: texture id string / rbxassetid / { Id = , Tint = } / built-in name / emoji text
+-- Turns every pixel of an icon white (alpha untouched) so ImageColor3 can tint it.
+-- Result is cached per image; returns a Content for ImageLabel.ImageContent, or nil on failure.
+local RecolorCache = {}
+local function getWhiteContent(assetUrl)
+	local cached = RecolorCache[assetUrl]
+	if cached == "pending" then
+		while RecolorCache[assetUrl] == "pending" do
+			task.wait(0.05)
+		end
+		cached = RecolorCache[assetUrl]
+	elseif cached == nil then
+		RecolorCache[assetUrl] = "pending"
+		local ok, result = pcall(function()
+			local assetId = tonumber(string.match(assetUrl, "%d+"))
+			local content = Content.fromAssetId(assetId)
+			local img = AssetService:CreateEditableImageAsync(content)
+			local size = img.Size
+			local buf = img:ReadPixelsBuffer(Vector2.zero, size)
+			local len = buffer.len(buf)
+			for i = 0, len - 4, 4 do
+				buffer.writeu8(buf, i, 255)
+				buffer.writeu8(buf, i + 1, 255)
+				buffer.writeu8(buf, i + 2, 255)
+				if i % 262144 == 0 then
+					task.wait()
+				end
+			end
+			img:WritePixelsBuffer(Vector2.zero, size, buf)
+			return img
+		end)
+		if ok and result then
+			RecolorCache[assetUrl] = result
+		else
+			RecolorCache[assetUrl] = false
+			warn("[MacUI] Could not recolor icon " .. tostring(assetUrl)
+				.. " (EditableImage blocked or not allowed for this asset). "
+				.. "Upload a white version of the icon, or set Tint = false. Reason: " .. tostring(result))
+		end
+		cached = RecolorCache[assetUrl]
+	end
+	if cached then
+		return Content.fromObject(cached)
+	end
+	return nil
+end
+
+-- icon can be: texture id string / rbxassetid / { Id = , Tint = , Recolor = } / built-in name / emoji text
 local function makeIcon(parent, icon, size)
 	size = size or 16
 
 	if isAssetLike(icon) then
-		local id, tint
+		local id, tint, recolor
 		if type(icon) == "table" then
-			id, tint = normalizeAsset(icon.Id), icon.Tint
+			id, tint, recolor = normalizeAsset(icon.Id), icon.Tint, icon.Recolor
 		else
 			id = normalizeAsset(icon)
 		end
 		if tint == nil then
 			tint = TINT_IMAGE_ICONS
+		end
+		if recolor == nil then
+			recolor = RECOLOR_ICONS
 		end
 		local image = New("ImageLabel", {
 			Name = "Icon",
@@ -341,6 +400,14 @@ local function makeIcon(parent, icon, size)
 			Size = UDim2.fromOffset(size, size),
 			Parent = parent,
 		})
+		if tint and recolor then
+			task.spawn(function()
+				local content = getWhiteContent(id)
+				if content and image.Parent then
+					image.ImageContent = content
+				end
+			end)
+		end
 		return { Kind = "image", Root = image, Tint = tint }
 	end
 
@@ -1636,7 +1703,7 @@ end
 ------------------------------------------------------------------
 local Window = MacUI.CreateWindow({
 	Title = "Nyx Hub",
-	Subtitle = "version 1.6.5.2",
+	Subtitle = "version 1.6.5.3",
 	Logo = "rbxassetid://134813417493601",
 	-- Glass = 0.18,   -- 0 = solid window, up to 0.6 = very see-through
 	-- Theme = "Dark",
