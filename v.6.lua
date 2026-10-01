@@ -103,12 +103,13 @@ end
 -- ใส่ Texture/Image ID ของคุณตรงนี้ได้เลย
 -- ตัวอย่าง: Farming = "123456789" หรือ "rbxassetid://123456789"
 -- ถ้ายังไม่ใส่ จะ fallback ไปใช้ built-in icon เดิม
+-- แนะนำ Texture สีขาว + พื้นหลังโปร่งใส เพื่อให้เปลี่ยนสีตาม Theme ได้
 ----------------------------------------------------------------------
 local IconTextures = {
 	Farming  = nil, -- "123456789"
-	Loadout  = "119764640250310", Tint = false, -- "123456789"
+	Loadout  = nil, -- "123456789"
 	Movement = nil, -- "123456789"
-	Equip    = nil, -- "123456789"
+	Equip    = "119764640250310", -- "123456789"
 	Training = nil, -- "123456789"
 	Travel   = nil, -- "123456789"
 	Settings = nil, -- "123456789"
@@ -116,15 +117,55 @@ local IconTextures = {
 	Home     = nil, -- "123456789"
 	Combat   = nil, -- "123456789"
 	Search   = nil, -- "123456789"
-	List     = nil, -- "123456789"
+	List     = "90930617752169", -- "123456789"
 	Chevron  = nil, -- "123456789"
 }
 
-local function getIconTexture(name)
-	if not name then
-		return nil
+local IconTextureKeys = {
+	sprout = "Farming", farming = "Farming",
+	bag = "Loadout", loadout = "Loadout", backpack = "Loadout",
+	arrow = "Movement", movement = "Movement", run = "Movement",
+	shield = "Equip", equip = "Equip",
+	dumbbell = "Training", training = "Training",
+	pin = "Travel", travel = "Travel", map = "Travel",
+	gear = "Settings", settings = "Settings",
+	user = "Character", character = "Character",
+	home = "Home",
+	sword = "Combat", combat = "Combat", swords = "Combat",
+	search = "Search",
+	list = "List",
+	chevron = "Chevron",
+}
+
+local function getIconTexture(icon)
+	if icon == nil then return nil end
+	local key = tostring(icon)
+
+	local direct = normalizeAsset(key)
+	if direct and (string.find(direct, "rbxasset") or string.find(direct, "http")) then
+		return direct
 	end
-	return IconTextures[name] or IconTextures[string.lower(name)]
+
+	if IconTextures[key] then
+		return normalizeAsset(IconTextures[key])
+	end
+
+	local slot = IconTextureKeys[string.lower(key)]
+	if slot and IconTextures[slot] then
+		return normalizeAsset(IconTextures[slot])
+	end
+
+	return nil
+end
+
+-- Returns a texture ID if one was configured for the tab/icon.
+-- You can put either a number string or a full rbxassetid:// string.
+local function getConfiguredIcon(name, fallback)
+	local texture = getIconTexture(name)
+	if texture and texture ~= "" then
+		return texture
+	end
+	return fallback
 end
 
 ----------------------------------------------------------------------
@@ -299,49 +340,26 @@ end
 local function makeIcon(parent, icon, size)
 	size = size or 16
 
-	local name = resolveIconName(icon)
-
-	if name then
-		return buildIcon(name, parent, size)
-	end
-
-	local img = normalizeAsset(icon)
-
-	if img and (string.find(img, "rbxasset") or string.find(img, "http")) then
+	-- Custom Texture ID first.
+	-- Put your IDs in IconTextures near the top of this file.
+	local texture = getIconTexture(icon)
+	if texture then
 		local image = New("ImageLabel", {
 			Name = "Icon",
 			BackgroundTransparency = 1,
-			Image = img,
-
-			-- สีเริ่มต้น
-			ImageColor3 = Color3.fromRGB(150, 157, 171),
-
-			Size = UDim2.fromOffset(size, size),
+			BorderSizePixel = 0,
+			Image = texture,
+			ImageColor3 = Color3.fromRGB(255, 255, 255),
+			ImageTransparency = 0,
 			ScaleType = Enum.ScaleType.Fit,
-
+			Size = UDim2.fromOffset(size, size),
 			Parent = parent,
 		})
 
-		return {
-			Kind = "image",
-			Root = image,
-		}
+		return { Kind = "image", Root = image }
 	end
 
-	return {
-		Kind = "text",
-		Root = New("TextLabel", {
-			BackgroundTransparency = 1,
-			Text = icon or "",
-			Font = Enum.Font.Gotham,
-			TextSize = size - 2,
-			Size = UDim2.fromOffset(size, size),
-			Parent = parent,
-		}),
-	}
-end
-
-	-- built-in fallback
+	-- Built-in fallback if no Texture ID was supplied.
 	local name = type(icon) == "string" and resolveIconName(icon) or nil
 	if name then
 		return buildIcon(name, parent, size)
@@ -367,7 +385,6 @@ local function tintIcon(ic, color)
 	end
 
 	if ic.Kind == "drawn" then
-
 		for _, p in ipairs(ic.Parts) do
 			if p.Kind == "fill" then
 				p.Inst.BackgroundColor3 = color
@@ -377,11 +394,15 @@ local function tintIcon(ic, color)
 		end
 
 	elseif ic.Kind == "image" then
-
+		-- IMPORTANT:
+		-- ImageColor3 works as a tint/multiply operation.
+		-- For the icon to change from white/gray into the Theme color,
+		-- the uploaded Texture should have a transparent background and
+		-- a white/light icon. A pure black source cannot be recolored
+		-- by ImageColor3 because black multiplied by any color stays black.
 		ic.Root.ImageColor3 = color
 
 	elseif ic.Kind == "text" then
-
 		ic.Root.TextColor3 = color
 	end
 end
@@ -1402,7 +1423,7 @@ function MacUI.CreateWindow(opts)
 		local tab = Window:AddTab({
 			Section = o.Section or "Settings",
 			Name = o.Name or "Settings",
-			Icon = o.Icon or "gear",
+			Icon = o.Icon or getConfiguredIcon("Settings", "gear"),
 		})
 
 		local look = tab:AddSection({ Title = "Appearance", Desc = "Change the UI color tone." })
@@ -1539,11 +1560,35 @@ local Window = MacUI.CreateWindow({
 
 -- Icon IDs are controlled from IconTextures near the top of this file.
 -- You do NOT need to edit these Icon values unless you want a per-tab fallback.
-local Farming = Window:AddTab({ Section = "Auto Farm", Name = "Farming", Icon = "sprout" })
-local Loadout = Window:AddTab({ Section = "Combat", Name = "Loadout", Icon = "bag" })
-local Movement = Window:AddTab({ Section = "Character", Name = "Movement", Icon = "arrow" })
-local Equip = Window:AddTab({ Section = "Accessories", Name = "Equip", Icon = "shield" })
-local Travel = Window:AddTab({ Section = "Navigation", Name = "Travel", Icon = "pin" })
+local Farming = Window:AddTab({
+	Section = "Auto Farm",
+	Name = "Farming",
+	Icon = getConfiguredIcon("Farming", "sprout"),
+})
+
+local Loadout = Window:AddTab({
+	Section = "Combat",
+	Name = "Loadout",
+	Icon = getConfiguredIcon("Loadout", "bag"),
+})
+
+local Movement = Window:AddTab({
+	Section = "Character",
+	Name = "Movement",
+	Icon = getConfiguredIcon("Movement", "arrow"),
+})
+
+local Equip = Window:AddTab({
+	Section = "Accessories",
+	Name = "Equip",
+	Icon = getConfiguredIcon("Equip", "shield"),
+})
+
+local Travel = Window:AddTab({
+	Section = "Navigation",
+	Name = "Travel",
+	Icon = getConfiguredIcon("Travel", "pin"),
+})
 
 local General = Farming:AddSection({ Title = "General", Desc = "Main toggles for this tab." })
 General:AddToggle({
