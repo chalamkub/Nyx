@@ -9,7 +9,7 @@
 --   local Window = MacUI.CreateWindow({
 --       Title = "My Hub", Subtitle = "v1.0",
 --       Logo = "rbxassetid://123",          -- only used on the floating open button
---       Theme = "Midnight",                      -- Dark | Midnight | Mocha | Light
+--       Theme = "Dark",                      -- Dark | Midnight | Mocha | Light
 --       Accent = Color3.fromRGB(41, 148, 255),
 --       Glass = 0.18,                        -- 0 = solid, up to 0.6 = very see-through
 --       Icons = { Farming = "123456789" },   -- same as MacUI.SetIcons
