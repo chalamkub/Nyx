@@ -376,87 +376,50 @@ end)
 
 
 --// =========================
---// UPDATE LABEL
+--// UPDATE LABEL (แก้เพิ่มวินาที)
 --// =========================
 
 local function UpdateTimeLabel()
 
-    local Remaining =
-        ExpireTimestamp - os.time()
-
+    local Remaining = ExpireTimestamp - os.time()
 
     --// หมดอายุ
-
     if Remaining <= 0 then
-
         if TimeLabel then
-
             pcall(function()
-
                 TimeLabel:Set({
-
                     Title = "Whitelist",
-
                     Content = "Key หมดอายุแล้ว"
-
                 })
-
             end)
-
         end
-
         return false
-
     end
 
-
     --// คำนวณเวลา
-
-    local Days =
-        math.floor(Remaining / 86400)
-
-    local Hours =
-        math.floor(
-            (Remaining % 86400) / 3600
-        )
-
-    local Minutes =
-        math.floor(
-            (Remaining % 3600) / 60
-        )
-
+    local Days = math.floor(Remaining / 86400)
+    local Hours = math.floor((Remaining % 86400) / 3600)
+    local Minutes = math.floor((Remaining % 3600) / 60)
+    local Seconds = Remaining % 60 -- คำนวณวินาที
 
     local Text =
         "เหลือเวลา " ..
-        tostring(Days) ..
-        " วัน " ..
-        tostring(Hours) ..
-        " ชั่วโมง " ..
-        tostring(Minutes) ..
-        " นาที"
-
+        tostring(Days) .. " วัน " ..
+        tostring(Hours) .. " ชั่วโมง " ..
+        tostring(Minutes) .. " นาที " ..
+        tostring(Seconds) .. " วินาที"
 
     --// อัปเดต UI
-
     if TimeLabel then
-
         pcall(function()
-
             TimeLabel:Set({
-
                 Title = "Whitelist",
-
                 Content = Text
-
             })
-
         end)
-
     end
 
-
     return true
-
 end
 
 
@@ -468,23 +431,19 @@ UpdateTimeLabel()
 
 
 --// =========================
---// COUNTDOWN LOOP
+--// COUNTDOWN LOOP (แก้เป็น 1 วิ)
 --// =========================
 
 task.spawn(function()
-
     while true do
-
-        task.wait(60)
-
+        task.wait(1)
+        
         local Active = UpdateTimeLabel()
 
         if not Active then
             break
         end
-
     end
-
 end)
 
 
