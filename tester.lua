@@ -61,6 +61,16 @@ end
 
 print("Whitelist verified!")
 
+local expireAt = os.time() + 23 * 3600 + 53 * 60  -- ใส่เวลาหมดอายุจริงจากระบบคีย์
+task.spawn(function()
+    while table.find(MacUI._windows, Window) do  -- หยุดเองเมื่อปิด UI
+        local left = math.max(expireAt - os.time(), 0)
+        Window:SetUserNote(string.format('Expires: <font color="#FF8A3D">%dh %dm</font>',
+            math.floor(left / 3600), math.floor(left % 3600 / 60)))
+        task.wait(30)
+    end
+end)
+
 -- ใส่โค้ดสคริปต์หลักของคุณต่อจากตรงนี้
 
 --[[
