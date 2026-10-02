@@ -162,11 +162,16 @@ end
 -- EXPIRES AT
 --==================================================
 
-local ExpiresAt = Data.expires_at
+local IsLifetime = Data.lifetime == true
+local ExpiresAt = Data.expires_at or "Lifetime"
+local ExpireTimestamp
 
-if not ExpiresAt then
-    LocalPlayer:Kick("Expiration time missing")
-    return
+if not IsLifetime then
+    if type(Data.expires_in) ~= "number" then
+        LocalPlayer:Kick("Expiration time missing")
+        return
+    end
+    ExpireTimestamp = os.time() + Data.expires_in
 end
 
 
@@ -405,14 +410,16 @@ end
 --==================================================
 
 task.spawn(function()
+    if IsLifetime then
+        CountdownLabel.Text = "เหลือเวลา: ถาวร"
+        return
+    end
     while true do
         local remaining = ExpireTimestamp - os.time()
-
         if remaining <= 0 then
             CountdownLabel.Text = "เหลือเวลา: หมดอายุแล้ว"
             break
         end
-
         CountdownLabel.Text = "เหลือเวลา: " .. FormatTime(remaining)
         task.wait(1)
     end
