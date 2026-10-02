@@ -1,42 +1,72 @@
---==================================================
--- NYX WHITELIST LOADER
--- Key + HWID + PHP API
---==================================================
+```lua
+--[[
+    NYX Whitelist Tester
+    Key + HWID verification
+
+    API:
+    https://zerzy.com/api/verify.php
+
+    วิธีใช้:
+    getgenv().Key = "YOUR-KEY"
+    loadstring(game:HttpGet(
+        "https://raw.githubusercontent.com/chalamkub/Nyx/refs/heads/main/tester.lua"
+    ))()
+]]
 
 local Players = game:GetService("Players")
 local HttpService = game:GetService("HttpService")
 
 local LocalPlayer = Players.LocalPlayer
 
---==================================================
+-- =========================================================
 -- CONFIG
---==================================================
+-- =========================================================
 
 local API_URL = "https://zerzy.com/api/verify.php"
 
 local UI_LIBRARY_URL =
     "https://raw.githubusercontent.com/chalamkub/Nyx/refs/heads/main/MacUI_Library_v2.lua"
 
---==================================================
+-- =========================================================
+-- DEBUG
+-- =========================================================
+
+local function Debug(...)
+    print("[NYX]", ...)
+end
+
+local function Fail(message)
+    warn("[NYX] " .. tostring(message))
+
+    if LocalPlayer then
+        pcall(function()
+            LocalPlayer:Kick("Whitelist: " .. tostring(message))
+        end)
+    end
+end
+
+-- =========================================================
 -- GET KEY
---==================================================
+-- =========================================================
 
 local Key = getgenv().Key
 
 if not Key or tostring(Key) == "" then
-    LocalPlayer:Kick("Whitelist: กรุณาใส่ Key ก่อนรันสคริปต์")
+    Fail("ไม่พบ Key")
     return
 end
 
 Key = tostring(Key)
 
---==================================================
--- HWID
---==================================================
+Debug("Key:", Key)
+
+-- =========================================================
+-- GET HWID
+-- =========================================================
 
 local function GetHWID()
 
-    -- บาง environment ใช้ gethwid()
+    -- gethwid
     if type(gethwid) == "function" then
         local success, result = pcall(gethwid)
 
@@ -45,7 +75,7 @@ local function GetHWID()
         end
     end
 
-    -- บาง environment ใช้ get_hwid()
+    -- get_hwid
     if type(get_hwid) == "function" then
         local success, result = pcall(get_hwid)
 
@@ -54,7 +84,7 @@ local function GetHWID()
         end
     end
 
-    -- บาง environment มี syn.get_hwid()
+    -- syn.get_hwid
     if syn and type(syn.get_hwid) == "function" then
         local success, result = pcall(syn.get_hwid)
 
@@ -69,27 +99,30 @@ end
 local HWID = GetHWID()
 
 if not HWID then
-    LocalPlayer:Kick(
-        "Whitelist: ไม่พบ HWID API ของ environment นี้"
-    )
+    Fail("ไม่สามารถอ่าน HWID ได้")
     return
 end
 
---==================================================
--- HTTP REQUEST
---==================================================
+Debug("HWID:", HWID)
+
+-- =========================================================
+-- GET REQUEST FUNCTION
+-- =========================================================
 
 local function GetRequestFunction()
 
     if type(request) == "function" then
+        Debug("Using request()")
         return request
     end
 
     if type(http_request) == "function" then
+        Debug("Using http_request()")
         return http_request
     end
 
     if syn and type(syn.request) == "function" then
+        Debug("Using syn.request()")
         return syn.request
     end
 
@@ -99,26 +132,45 @@ end
 local Request = GetRequestFunction()
 
 if not Request then
-    LocalPlayer:Kick(
-        "Whitelist: Environment ไม่มี HTTP Request API"
-    )
+    Fail("Executor ไม่มี HTTP Request function")
     return
 end
 
---==================================================
--- CREATE REQUEST
---==================================================
+-- =========================================================
+-- CREATE JSON
+-- =========================================================
 
-local RequestBody = HttpService:JSONEncode({
-    key = Key,
-    hwid = HWID
-})
+local RequestBody
 
-local RequestResult
+local EncodeSuccess, EncodeResult = pcall(function()
 
-local RequestSuccess, RequestError = pcall(function()
+    return HttpService:JSONEncode({
+        key = Key,
+        hwid = HWID
+    })
 
-    RequestResult = Request({
+end)
+
+if not EncodeSuccess then
+    Fail("ไม่สามารถสร้าง JSON ได้")
+    return
+end
+
+RequestBody = EncodeResult
+
+Debug("Request Body:")
+print(RequestBody)
+
+-- =========================================================
+-- SEND API REQUEST
+-- =========================================================
+
+Debug("Sending request...")
+Debug("API:", API_URL)
+
+local RequestSuccess, RequestResult = pcall(function()
+
+    return Request({
         Url = API_URL,
 
         Method = "POST",
@@ -135,41 +187,42 @@ end)
 
 if not RequestSuccess then
 
-    LocalPlayer:Kick(
-        "Whitelist: เชื่อมต่อ API ไม่สำเร็จ"
-    )
+    warn("========== NYX REQUEST ERROR ==========")
+    warn(tostring(RequestResult))
+    warn("=======================================")
 
-    warn(
-        "[NYX WHITELIST] Request Error:",
-        RequestError
-    )
-
+    Fail("ส่ง Request ไป API ไม่สำเร็จ")
     return
 end
 
 if not RequestResult then
-
-    LocalPlayer:Kick(
-        "Whitelist: API ไม่ส่งข้อมูลกลับมา"
-    )
-
+    Fail("API ไม่ส่ง Response กลับมา")
     return
 end
 
---==================================================
+-- =========================================================
 -- READ RESPONSE
---==================================================
+-- =========================================================
 
+local StatusCode = RequestResult.StatusCode
 local ResponseBody = RequestResult.Body
 
+warn("========== NYX API DEBUG ==========")
+warn("Status:", tostring(StatusCode))
+warn("Body:")
+warn(tostring(ResponseBody))
+warn("===================================")
+
 if not ResponseBody then
-
-    LocalPlayer:Kick(
-        "Whitelist: Response ไม่มี Body"
-    )
-
+    Fail("API ไม่มี Response Body")
     return
 end
+
+ResponseBody = tostring(ResponseBody)
+
+-- =========================================================
+-- DECODE JSON
+-- =========================================================
 
 local DecodeSuccess, Data = pcall(function()
     return HttpService:JSONDecode(ResponseBody)
@@ -177,54 +230,53 @@ end)
 
 if not DecodeSuccess then
 
-    warn(
-        "[NYX WHITELIST] Invalid JSON:",
-        ResponseBody
-    )
+    warn("========== NYX JSON ERROR ==========")
+    warn("Status:", tostring(StatusCode))
+    warn("Raw Body:")
+    warn(ResponseBody)
+    warn("====================================")
 
-    LocalPlayer:Kick(
-        "Whitelist: Server ส่งข้อมูลไม่ถูกต้อง"
-    )
-
+    Fail("Server ส่งข้อมูลไม่ถูกต้อง")
     return
 end
 
---==================================================
--- CHECK RESULT
---==================================================
+if type(Data) ~= "table" then
+    Fail("รูปแบบข้อมูลจาก Server ไม่ถูกต้อง")
+    return
+end
 
-if not Data.success then
+-- =========================================================
+-- CHECK API RESULT
+-- =========================================================
+
+if Data.success ~= true then
 
     local Message = tostring(
-        Data.message or "Key ไม่ถูกต้อง"
+        Data.message or "Whitelist verification failed"
     )
 
-    LocalPlayer:Kick(
-        "Whitelist: " .. Message
-    )
+    warn("[NYX] API rejected request:")
+    warn(Message)
 
+    Fail(Message)
     return
 end
 
---==================================================
+-- =========================================================
 -- WHITELIST SUCCESS
---==================================================
+-- =========================================================
 
-print("================================")
-print("NYX WHITELIST")
-print("Status : VERIFIED")
-print("Key    :", Key)
-print("HWID   :", HWID)
+print("======================================")
+print("[NYX] WHITELIST SUCCESS")
+print("[NYX] Message:", tostring(Data.message))
+print("[NYX] Expires:", tostring(Data.expires_at))
+print("======================================")
 
-if Data.expires_at then
-    print("Expire :", Data.expires_at)
-end
-
-print("================================")
-
---==================================================
+-- =========================================================
 -- LOAD UI LIBRARY
---==================================================
+-- =========================================================
+
+Debug("Loading UI Library...")
 
 local UISuccess, MacUI = pcall(function()
 
@@ -234,70 +286,115 @@ local UISuccess, MacUI = pcall(function()
 
 end)
 
-if not UISuccess or not MacUI then
+if not UISuccess then
 
-    warn(
-        "[NYX] MacUI Library Load Failed:",
-        MacUI
-    )
+    warn("========== NYX UI ERROR ==========")
+    warn(tostring(MacUI))
+    warn("==================================")
 
-    LocalPlayer:Kick(
-        "Whitelist ผ่านแล้ว แต่โหลด UI ไม่สำเร็จ"
-    )
-
+    Fail("โหลด UI Library ไม่สำเร็จ")
     return
 end
 
---==================================================
+if not MacUI then
+    Fail("UI Library ไม่ส่ง Library กลับมา")
+    return
+end
+
+Debug("UI Library loaded successfully")
+
+-- =========================================================
 -- CREATE WINDOW
---==================================================
+-- =========================================================
 
-local Window = MacUI:MakeWindow({
+local WindowSuccess, Window = pcall(function()
 
-    Name = "My Premium Script",
+    return MacUI:MakeWindow({
 
-    HidePremium = false,
+        Name = "My Premium Script",
 
-    SaveConfig = true,
+        HidePremium = false,
 
-    ConfigFolder = "MyScriptConfig"
+        SaveConfig = true,
 
-})
+        ConfigFolder = "MyScriptConfig"
 
---==================================================
--- MAIN TAB
---==================================================
+    })
 
-local MainTab = Window:MakeTab({
+end)
 
-    Name = "Main",
+if not WindowSuccess then
 
-    Icon = "rbxassetid://4483345998",
+    warn("[NYX] MakeWindow Error:")
+    warn(tostring(Window))
 
-    PremiumOnly = false
+    Fail("สร้าง UI ไม่สำเร็จ")
+    return
+end
 
-})
+-- =========================================================
+-- CREATE TAB
+-- =========================================================
 
---==================================================
--- TEST BUTTON
---==================================================
+local TabSuccess, MainTab = pcall(function()
 
-MainTab:AddButton({
+    return Window:MakeTab({
 
-    Name = "ฟังก์ชันทำงาน",
+        Name = "Main",
 
-    Callback = function()
+        Icon = "rbxassetid://4483345998",
 
-        print(
-            "[NYX] Script is working!"
-        )
+        PremiumOnly = false
 
-    end
+    })
 
-})
+end)
 
---==================================================
--- FINISHED
---==================================================
+if not TabSuccess then
 
-print("[NYX] Script loaded successfully.")
+    warn("[NYX] MakeTab Error:")
+    warn(tostring(MainTab))
+
+    Fail("สร้าง Tab ไม่สำเร็จ")
+    return
+end
+
+-- =========================================================
+-- BUTTON
+-- =========================================================
+
+local ButtonSuccess, ButtonError = pcall(function()
+
+    MainTab:AddButton({
+
+        Name = "ฟังก์ชันทำงาน",
+
+        Callback = function()
+
+            print("[NYX] Script is working!")
+
+        end
+
+    })
+
+end)
+
+if not ButtonSuccess then
+
+    warn("[NYX] AddButton Error:")
+    warn(tostring(ButtonError))
+
+    Fail("สร้างปุ่มไม่สำเร็จ")
+    return
+end
+
+-- =========================================================
+-- DONE
+-- =========================================================
+
+print("======================================")
+print("[NYX] Script loaded successfully!")
+print("[NYX] Key:", Key)
+print("[NYX] Expires:", tostring(Data.expires_at))
+print("======================================")
+```
