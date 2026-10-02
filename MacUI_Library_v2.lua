@@ -39,6 +39,26 @@
 --     Window:Show() Hide() Toggle() SetVisible(bool) IsVisible()
 --     The Settings tab has a "Toggle UI" row: click it, press a key (Backspace = none, Esc = cancel).
 --
+-- Supported scripting styles (arguments and names are detected automatically):
+--   Rayfield  : Window:CreateTab(name, icon) / Tab:CreateSection / CreateButton, CreateToggle, CreateSlider, CreateDropdown
+--               (CurrentOption table, MultipleOptions), CreateInput, CreateKeybind, CreateColorPicker, CreateLabel,
+--               CreateParagraph, CreateDivider, Flag + MacUI.Flags.X.CurrentValue, ConfigurationSaving, LoadConfiguration
+--   Orion     : MakeWindow / MakeTab / AddButton ... AddParagraph("title", "text"), Flag, MakeNotification, Init()
+--   Kavo      : CreateLib("title", "DarkTheme") / NewTab / NewSection / NewButton(name, tip, cb) / NewSlider(name, tip, max, min, cb)
+--               ... and :UpdateButton / UpdateToggle / UpdateSlider / UpdateLabel
+--   Venyx     : new("title", theme) / addPage / addSection / addButton, addToggle(title, default, cb), addSlider(title, default,
+--               min, max, cb), addDropdown(title, list, cb), addKeybind, addColorPicker, addTextbox / section:updateToggle(...)
+--   Linoria / Obsidian : Tab:AddLeftGroupbox / AddRightGroupbox / AddTabbox, groupbox:AddToggle("Idx", { Text = .. }),
+--               AddSlider, AddDropdown (Multi), AddInput, AddButton, AddLabel, AddDivider, toggle:AddKeyPicker / AddColorPicker,
+--               AddDependencyBox; Toggles.Idx / Options.Idx (.Value, :SetValue, :OnChanged, :GetState)
+--   Fluent    : Tab:AddToggle("Idx", { Title = .. }), AddSlider (Rounding), AddDropdown, AddInput, AddKeybind, AddColorpicker,
+--               AddParagraph, MacUI.Options.Idx, Window:SelectTab, Window:Dialog, MinimizeKey, Notify with SubContent
+--   Wally     : Library:CreateWindow("name") then window:Section / Toggle / Button / Slider / Dropdown / Bind / Box / ColorPicker
+--               with option tables { flag = .., location = .. } (location[flag] is kept up to date)
+--   Config    : Window:SaveConfig(name) / LoadConfig(name) save every control that has a flag / idx (needs writefile).
+--   Not supported (accepted but ignored): key systems, loading screens, watermark, add-on managers (SaveManager,
+--   ThemeManager, InterfaceManager), image / video rows.
+--
 -- Window buttons: red = close script (asks to confirm), yellow = 2 sizes, green = hide.
 -- Built-in drawn icons: sprout, bag, arrow, shield, dumbbell, pin, gear, user, home, sword, search, list,
 --   sidebar, left, right, updown, lock, star, bolt, eye, folder
@@ -347,6 +367,9 @@ local IconAlias = {
 	equip = "shield", training = "dumbbell", travel = "pin", map = "pin", settings = "gear",
 	character = "user", combat = "sword", swords = "sword",
 	locked = "lock", favorite = "star", power = "bolt", visual = "eye", esp = "eye", files = "folder",
+	cog = "gear", settings2 = "gear", player = "user", users = "user", person = "user", target = "pin",
+	["map-pin"] = "pin", zap = "bolt", ["folder-open"] = "folder", unlock = "lock", key = "lock", flame = "bolt",
+	sparkles = "star", ["sliders-horizontal"] = "gear", wrench = "gear", tool = "gear", house = "home",
 }
 
 local function resolveIconName(s)
@@ -504,6 +527,9 @@ local function makeIcon(parent, icon, size)
 	if name then
 		return buildIcon(name, parent, size)
 	end
+	if #icon > 1 and string.match(icon, "^[%w_%-%.]+$") then
+		return buildIcon("list", parent, size) -- an icon name this library does not draw (not an emoji)
+	end
 
 	return {
 		Kind = "text",
@@ -581,30 +607,66 @@ local function toKeyCode(k)
 	return nil
 end
 
--- every control type and the alternative method names that map to it
+-- control kinds and every method name (from other UI libraries) that maps to them
 local KIND_NAMES = {
-	Button = { "Button", "CreateButton", "NewButton" },
-	Toggle = { "Toggle", "CreateToggle", "NewToggle" },
-	Slider = { "Slider", "CreateSlider", "NewSlider" },
-	Dropdown = { "Dropdown", "CreateDropdown", "NewDropdown" },
-	Label = { "Label", "CreateLabel", "NewLabel", "Paragraph", "AddParagraph", "CreateParagraph" },
+	Button = { "Button", "CreateButton", "NewButton", "addButton", "MakeButton" },
+	Toggle = { "Toggle", "CreateToggle", "NewToggle", "addToggle", "MakeToggle", "AddCheckbox", "Checkbox", "CreateCheckbox" },
+	Slider = { "Slider", "CreateSlider", "NewSlider", "addSlider", "MakeSlider" },
+	Dropdown = { "Dropdown", "CreateDropdown", "NewDropdown", "addDropdown", "MakeDropdown" },
+	Label = {
+		"Label", "CreateLabel", "NewLabel", "addLabel", "MakeLabel",
+		"Paragraph", "AddParagraph", "CreateParagraph", "NewParagraph", "addParagraph",
+	},
 	Textbox = {
-		"Textbox", "TextBox", "CreateTextbox", "CreateTextBox", "AddTextBox", "NewTextbox",
-		"Input", "AddInput", "CreateInput",
+		"Textbox", "TextBox", "CreateTextbox", "CreateTextBox", "AddTextBox", "NewTextbox", "NewTextBox",
+		"addTextbox", "addTextBox", "Input", "AddInput", "CreateInput", "Box", "CreateBox", "AddBox",
 	},
 	Bind = {
 		"Bind", "Keybind", "KeyBind", "CreateBind", "CreateKeybind", "AddKeybind", "AddKeyBind", "NewBind",
+		"NewKeybind", "addKeybind", "AddKeyPicker", "KeyPicker", "CreateKeyPicker",
+	},
+	ColorPicker = {
+		"ColorPicker", "Colorpicker", "CreateColorPicker", "CreateColorpicker", "AddColorpicker", "NewColorPicker",
+		"addColorPicker", "ColourPicker", "AddColourPicker",
 	},
 }
+local DIVIDER_NAMES = {
+	"AddDivider", "CreateDivider", "Divider", "AddSeparator", "CreateSeparator", "Separator", "NewDivider",
+}
+local BLANK_NAMES = { "AddBlank", "Blank", "AddSpace", "CreateSpace", "AddSpacer", "CreateSpacer", "Spacer" }
+local SECTION_NAMES = {
+	"AddSection", "CreateSection", "NewSection", "Section", "addSection", "MakeSection", "CreateGroup", "AddGroup",
+	"AddGroupbox", "AddLeftGroupbox", "AddRightGroupbox", "CreateFolder", "AddFolder",
+}
+local TAB_NAMES = {
+	"AddTab", "CreateTab", "MakeTab", "NewTab", "Tab", "addPage", "AddPage", "CreatePage", "NewPage", "MakePage", "Page",
+}
 
--- accepts the option names other UI libraries use (Title/Text, CurrentValue, Values, Content, ...)
+local COLOR3, ENUMITEM = "Color3", "EnumItem"
+
+local function hexOf(c)
+	return string.format("#%02X%02X%02X", math.floor(c.R * 255 + 0.5), math.floor(c.G * 255 + 0.5), math.floor(c.B * 255 + 0.5))
+end
+
+-- accepts the option names other UI libraries use (Title/Text, CurrentValue, Values, Content, flag, list, ...)
+local LOWER_KEYS = {
+	flag = "Flag", default = "Default", min = "Min", max = "Max", list = "Options", location = "Location",
+	precise = "Precise", name = "Name", text = "Name", callback = "Callback", value = "Value", type = "Type",
+}
 local function normControl(kind, o)
 	if type(o) == "string" then
 		o = { Name = o }
 	end
-	local n = copyTable(o or {})
+	o = o or {}
+	local n = copyTable(o)
+	for k, v in pairs(o) do
+		local c = type(k) == "string" and LOWER_KEYS[k]
+		if c and n[c] == nil then
+			n[c] = v
+		end
+	end
 	n.Name = firstNonNil(n.Name, n.Title, n.Text, n.Label)
-	n.Desc = firstNonNil(n.Desc, n.Description, n.Info)
+	n.Desc = firstNonNil(n.Desc, n.Description, n.Info, n.SubContent)
 	n.Callback = firstNonNil(n.Callback, n.Function, n.Action, n.Func)
 	if kind == "Toggle" then
 		n.Default = firstNonNil(n.Default, n.CurrentValue, n.Value, n.State, n.Enabled, false)
@@ -617,13 +679,18 @@ local function normControl(kind, o)
 		n.Max = firstNonNil(n.Max, n.Maximum)
 		n.Default = firstNonNil(n.Default, n.CurrentValue, n.Value, n.Min)
 		n.Increment = firstNonNil(n.Increment, n.Step)
+		if n.Increment == nil and type(n.Rounding) == "number" then
+			n.Increment = 10 ^ -n.Rounding
+		end
+		if n.Increment == nil and n.Precise then
+			n.Increment = 0.01
+		end
 		n.Suffix = firstNonNil(n.Suffix, n.ValueName)
 	elseif kind == "Dropdown" then
+		n._rayfield = (o.CurrentOption ~= nil) or (o.MultipleOptions ~= nil)
 		n.Options = firstNonNil(n.Options, n.Values, n.List, n.Items, n.Choices)
 		n.Default = firstNonNil(n.Default, n.CurrentOption, n.Value)
-		if type(n.Default) == "table" then
-			n.Default = n.Default[1]
-		end
+		n.Multi = (firstNonNil(n.Multi, n.MultipleOptions, n.Multiple) == true)
 	elseif kind == "Label" then
 		n.Value = firstNonNil(n.Value, n.Content, n.Description)
 		if n.Value == nil and n.Name ~= nil then
@@ -633,14 +700,167 @@ local function normControl(kind, o)
 	elseif kind == "Textbox" then
 		n.Default = firstNonNil(n.Default, n.CurrentValue, n.Value, "")
 		n.Placeholder = firstNonNil(n.Placeholder, n.PlaceholderText)
+		n.EnterOnly = firstNonNil(n.EnterOnly, n.Finished)
+		n.ClearOnFocus = firstNonNil(n.ClearOnFocus, n.ClearTextOnFocus)
+		n.ClearAfter = firstNonNil(n.ClearAfter, n.TextDisappear, n.RemoveTextAfterFocusLost)
+		if n.Numeric == nil and n.Type == "number" then
+			n.Numeric = true
+		end
 	elseif kind == "Bind" then
 		n.Default = firstNonNil(n.Default, n.CurrentKeybind, n.CurrentBind, n.Key, n.Keybind, n.Value)
-		n.OnChange = firstNonNil(n.OnChange, n.Changed, n.ChangedCallback)
+		n.OnChange = firstNonNil(n.OnChange, n.Changed, n.ChangedCallback, n.changedCallback)
+		n.Hold = firstNonNil(n.Hold, n.HoldToInteract)
+	elseif kind == "ColorPicker" then
+		n.Default = firstNonNil(n.Default, n.Color, n.CurrentValue, n.CurrentColor, n.Value)
 	end
 	return n
 end
 
+-- Turns the arguments of any control call into one option table, whatever the library style:
+--   table      Toggle({ Name = .. })                      Rayfield / Orion / Fluent
+--   idx+table  AddToggle("Idx", { Text = .. })            Linoria / Fluent
+--   Kavo       NewButton(name, tip, callback)  NewSlider(name, tip, max, min, callback) ...
+--   Venyx      addToggle(title, default, callback)  addSlider(title, default, min, max, callback) ...
+--   positional Toggle("name", { flag = .. }, callback)    Wally and similar
+local IDX_KINDS = { Toggle = true, Slider = true, Dropdown = true, Textbox = true, Bind = true, ColorPicker = true }
+local function parseControl(kind, nameUsed, ...)
+	local a1, a2, a3, a4, a5 = ...
+	local meta = {}
+	if type(a1) == "table" then
+		meta.native = (nameUsed == "Add" .. kind)
+		return normControl(kind, a1), meta
+	end
+	if type(a1) ~= "string" then
+		return normControl(kind, {}), meta
+	end
+
+	if string.match(nameUsed, "^New%u") then -- Kavo
+		local n = { Name = a1 }
+		if kind == "Button" or kind == "Toggle" or kind == "Textbox" then
+			n.Callback = a3
+		elseif kind == "Slider" then
+			n.Max, n.Min, n.Callback, n.Default = a3, a4, a5, a4
+		elseif kind == "Dropdown" then
+			n.Options, n.Callback = a3, a4
+		elseif kind == "Bind" or kind == "ColorPicker" then
+			n.Default, n.Callback = a3, a4
+		elseif kind == "Label" then
+			n.Name, n.Value = "", a1
+		end
+		return normControl(kind, n), meta
+	end
+
+	if string.match(nameUsed, "^add%u") then -- Venyx
+		local n = { Name = a1 }
+		if kind == "Button" then
+			n.Callback = a2
+		elseif kind == "Toggle" or kind == "Textbox" or kind == "ColorPicker" then
+			n.Default, n.Callback = a2, a3
+		elseif kind == "Bind" then
+			n.Default, n.Callback, n.OnChange = a2, a3, a4
+		elseif kind == "Slider" then
+			n.Default, n.Min, n.Max, n.Callback = a2, a3, a4, a5
+		elseif kind == "Dropdown" then
+			n.Options, n.Callback = a2, a3
+		elseif kind == "Label" then
+			n.Name, n.Value = "", a1
+		end
+		return normControl(kind, n), meta
+	end
+
+	if type(a2) == "table" and IDX_KINDS[kind] and string.match(nameUsed, "^Add") then -- Linoria / Fluent
+		local n = normControl(kind, a2)
+		meta.idx = a1
+		n.Name = firstNonNil(n.Name, a1)
+		return n, meta
+	end
+
+	-- generic positional: name first, then callback / options table / strings / booleans / numbers in any order
+	local n = { Name = a1 }
+	local strs, bools, nums = {}, {}, {}
+	for i = 2, select("#", ...) do
+		local v = select(i, ...)
+		local tv = type(v)
+		if tv == "function" then
+			n.Callback = n.Callback or v
+		elseif tv == "table" then
+			if kind == "Dropdown" and v[1] ~= nil and n.Options == nil then
+				n.Options = v
+			else
+				for k, x in pairs(v) do
+					n[k] = x
+				end
+			end
+		elseif tv == "string" then
+			table.insert(strs, v)
+		elseif tv == "boolean" then
+			table.insert(bools, v)
+		elseif tv == "number" then
+			table.insert(nums, v)
+		elseif typeof(v) == COLOR3 then
+			n.Default = v
+		elseif typeof(v) == ENUMITEM then
+			n.Default = v
+		end
+	end
+	if kind == "Label" then
+		n.Value = strs[1]
+	elseif kind == "Button" then
+		n.Desc = strs[1]
+	elseif kind == "Toggle" then
+		n.Default = bools[1]
+		n.Desc = strs[1]
+	elseif kind == "Slider" then
+		if #nums >= 3 then
+			n.Min, n.Max, n.Default = nums[1], nums[2], nums[3]
+		elseif #nums == 2 then
+			n.Min, n.Max = nums[1], nums[2]
+		elseif #nums == 1 then
+			n.Max = nums[1]
+		end
+	elseif kind == "Textbox" then
+		n.Default = strs[1]
+	elseif kind == "Bind" and n.Default == nil then
+		n.Default = strs[1]
+	end
+	return normControl(kind, n), meta
+end
+
+-- theme names of other libraries -> our preset + accent
+local ThemeMap = {
+	darktheme = { "Dark" }, lighttheme = { "Light" }, midnight = { "Midnight" }, mocha = { "Mocha" },
+	bloodtheme = { "Dark", "Red" }, grapetheme = { "Dark", "Purple" }, ocean = { "Midnight", "Teal" },
+	sentinel = { "Dark", "Blue" }, synapse = { "Dark", "Orange" },
+	default = { "Dark" }, amberglow = { "Mocha", "Orange" }, amethyst = { "Midnight", "Purple" },
+	bloom = { "Dark", "Pink" }, darkblue = { "Midnight", "Blue" }, green = { "Dark", "Green" },
+	light = { "Light" }, serenity = { "Light", "Teal" },
+	dark = { "Dark" }, darker = { "Midnight" }, aqua = { "Dark", "Teal" }, rose = { "Mocha", "Pink" },
+}
+
+local function unself(a, ...)
+	if a == MacUI then
+		return ...
+	end
+	return a, ...
+end
+
+MacUI.Flags, MacUI.Options, MacUI.Toggles = {}, {}, {}
+for _, t in ipairs({ MacUI.Flags, MacUI.Options, MacUI.Toggles }) do
+	setmetatable(t, { __macui = true })
+end
+pcall(function() -- Linoria-style globals: Toggles.X / Options.X (replaced when they are left over from an older MacUI)
+	local env = (getgenv and getgenv()) or _G
+	for name, tbl in pairs({ Toggles = MacUI.Toggles, Options = MacUI.Options }) do
+		local cur = env[name]
+		local mt = type(cur) == "table" and getmetatable(cur)
+		if cur == nil or (mt and mt.__macui) then
+			env[name] = tbl
+		end
+	end
+end)
+
 MacUI._windows = {} -- every live window, so MacUI.Destroy() can remove them all
+MacUI._onUnload = {}
 
 -- notifications (bottom-right corner, stack upwards)
 local notifyGui, notifyHolder
@@ -690,17 +910,23 @@ end
 
 -- MacUI.Notify({ Title = "..", Content = "..", Duration = 3, Type = "success" | "warning" | "error" })
 -- also works as Library:Notify(...) and Window:Notify(...); a plain string is the content
-function MacUI.Notify(a, b)
-	local o = a
-	if a == MacUI then
-		o = b
-	end
+function MacUI.Notify(...)
+	local o, b = unself(...)
 	if type(o) == "string" then
-		o = { Content = o }
+		if type(b) == "string" then
+			o = { Title = o, Content = b } -- Notify("title", "text")
+		elseif type(b) == "number" then
+			o = { Content = o, Duration = b } -- Notify("text", seconds)
+		else
+			o = { Content = o }
+		end
 	end
 	o = o or {}
 	local title = tostring(firstNonNil(o.Title, o.Name, "Notification"))
 	local content = tostring(firstNonNil(o.Content, o.Text, o.Description, o.Desc, ""))
+	if o.SubContent then
+		content = content .. "\n" .. tostring(o.SubContent)
+	end
 	local duration = tonumber(firstNonNil(o.Duration, o.Time, 3)) or 3
 	local C = MacUI._theme or NotifyDefault
 	local accent = NotifyTypes[string.lower(tostring(o.Type or ""))] or C.Accent
@@ -807,6 +1033,15 @@ end
 
 -- removes every window (and notifications) created by this library
 function MacUI.Destroy()
+	for _, fn in ipairs(MacUI._onUnload) do
+		task.spawn(fn)
+	end
+	MacUI._onUnload = {}
+	for _, t in ipairs({ MacUI.Flags, MacUI.Options, MacUI.Toggles }) do
+		for k in pairs(t) do
+			t[k] = nil
+		end
+	end
 	for _, w in ipairs(table.clone(MacUI._windows)) do
 		pcall(function()
 			w:Destroy()
@@ -826,6 +1061,24 @@ local function buildWindow(opts)
 		local c = copyTable(opts or {})
 		c.Title = firstNonNil(c.Title, c.Name, c.Text)
 		c.Subtitle = firstNonNil(c.Subtitle, c.SubTitle, c.Description)
+		if c.ToggleKey == nil then
+			c.ToggleKey = c.MinimizeKey -- Fluent
+		end
+		local th = c.Theme
+		if type(th) == "table" then -- Kavo / Venyx custom theme tables
+			c.Accent = c.Accent or th.SchemeColor or th.Accent or th.Glow
+			c.Theme = nil
+		elseif type(th) == "string" and not Presets[th] then
+			local m = ThemeMap[string.lower(th)]
+			if m then
+				c.Theme = m[1]
+				if m[2] and not c.Accent then
+					c.Accent = Accents[m[2]]
+				end
+			else
+				c.Theme = nil
+			end
+		end
 		opts = c
 	end
 	registerIcons(opts.Icons)
@@ -1463,7 +1716,7 @@ local function buildWindow(opts)
 				)
 			end
 		elseif activeSlider then
-			activeSlider(input.Position.X)
+			activeSlider(input.Position.X, input.Position.Y)
 		end
 	end))
 	table.insert(conns, UIS.InputEnded:Connect(function(input)
@@ -1702,9 +1955,425 @@ local function buildWindow(opts)
 		end)
 	end
 
+	-- ---------------------------------------------------------------- compat: value tracking, flags, config
+	local flagged = {} -- { name, obj, kind } of every control that has a flag / idx
+	local saveSoon = function() end -- replaced when config saving is enabled
+
+	local function toMap(list)
+		local m = {}
+		for _, v in ipairs(list or {}) do
+			m[v] = true
+		end
+		return m
+	end
+	local function mapToList(m, order)
+		local list = {}
+		if order then
+			for _, v in ipairs(order) do
+				if m[v] then
+					table.insert(list, v)
+				end
+			end
+		else
+			for k, on in pairs(m) do
+				if on then
+					table.insert(list, k)
+				end
+			end
+		end
+		return list
+	end
+
+	-- wraps a raw control: other callback styles, .Value / :OnChanged / :SetValue, Flags / Options / Toggles,
+	-- location[flag] writes (Wally), config saving and the helper methods other libraries give their objects
+	local function wrapControl(Section, kind, n, meta, raw)
+		local userCb = n.Callback
+		local flag = firstNonNil(meta.idx, n.Flag)
+		local location = n.Location
+		local listeners = {}
+		local obj
+		local multi = (kind == "Dropdown" and n.Multi == true)
+		local ddMode = "native" -- native: string / array, array: Rayfield, map: Linoria + Fluent
+		local mode = n.Mode and string.lower(tostring(n.Mode)) or nil
+		local state = (mode == "always")
+
+		if kind == "Dropdown" then
+			if n._rayfield then
+				ddMode = "array"
+			elseif meta.idx then
+				ddMode = "map"
+			end
+			local list = n.Options or {}
+			n.Options = list
+			local d = n.Default
+			local function byIndex(x)
+				if type(x) == "number" and list[x] ~= nil and type(list[x]) ~= "number" then
+					return list[x]
+				end
+				return x
+			end
+			if multi then
+				local arr = {}
+				if type(d) == "table" then
+					if #d > 0 then
+						for _, v in ipairs(d) do
+							table.insert(arr, v)
+						end
+					else
+						for _, v in ipairs(list) do
+							if d[v] then
+								table.insert(arr, v)
+							end
+						end
+					end
+				elseif d ~= nil then
+					arr = { byIndex(d) }
+				end
+				n.Default = arr
+			else
+				if type(d) == "table" then
+					if d[1] ~= nil then
+						d = d[1]
+					else
+						local found
+						for _, v in ipairs(list) do
+							if d[v] then
+								found = v
+								break
+							end
+						end
+						d = found
+					end
+				end
+				n.Default = byIndex(d)
+			end
+		end
+
+		local function ext(v) -- raw value -> what the script sees
+			if kind == "Dropdown" then
+				if ddMode == "array" then
+					return multi and v or { v }
+				elseif ddMode == "map" and multi then
+					return toMap(v)
+				end
+			end
+			return v
+		end
+		local function toRaw(v) -- what the script passes in -> raw value
+			if kind == "Dropdown" then
+				if type(v) == "table" then
+					local list = (#v > 0) and v or mapToList(v, obj and obj.Values or n.Options)
+					if multi then
+						return list
+					end
+					return list[1]
+				end
+				return v
+			elseif kind == "Bind" then
+				if v == false or v == "None" then
+					return false
+				end
+				return toKeyCode(v) or v
+			end
+			return v
+		end
+		local function setFields(v)
+			if not obj then
+				return
+			end
+			if kind == "Bind" then
+				local nm = (v == nil or v == Enum.KeyCode.Unknown) and "None" or v.Name
+				obj.Value, obj.CurrentKeybind = nm, nm
+			elseif kind == "Dropdown" then
+				local e = ext(v)
+				obj.Value = e
+				obj.CurrentOption = (ddMode == "array") and e or (multi and v or { v })
+				if location and flag then
+					location[flag] = e
+				end
+			elseif kind == "ColorPicker" then
+				obj.Value, obj.Color, obj.CurrentValue = v, v, v
+				if location and flag then
+					location[flag] = v
+				end
+			else
+				obj.Value, obj.CurrentValue = v, v
+				if location and flag then
+					location[flag] = v
+				end
+			end
+		end
+		local function changed(e)
+			for _, fn in ipairs(listeners) do
+				task.spawn(fn, e)
+			end
+			saveSoon()
+		end
+
+		-- callbacks the raw control will call
+		if kind == "Button" then
+			n.Callback = function()
+				if userCb then
+					task.spawn(userCb)
+				end
+			end
+		elseif kind == "Bind" then
+			local hold = (n.Hold == true)
+			n.Callback = function(key)
+				if mode == "always" then
+					return
+				end
+				if mode == "toggle" then
+					state = not state
+				elseif mode == "hold" then
+					state = true
+				end
+				if not userCb then
+					return
+				end
+				if mode == "toggle" or mode == "hold" then
+					task.spawn(userCb, state)
+				elseif hold then
+					task.spawn(userCb, true)
+				else
+					task.spawn(userCb, key)
+				end
+			end
+			if hold or mode == "hold" then
+				local userRel = n.Released
+				n.Released = function(key)
+					if mode == "hold" then
+						state = false
+					end
+					if userCb then
+						task.spawn(userCb, false)
+					end
+					if userRel then
+						task.spawn(userRel, key)
+					end
+				end
+			end
+			local userChange = n.OnChange
+			n.OnChange = function(key)
+				setFields(key)
+				changed(key.Name)
+				if userChange then
+					task.spawn(userChange, key)
+				end
+			end
+		elseif kind ~= "Label" then
+			n.Callback = function(v)
+				setFields(v)
+				local e = ext(v)
+				for _, fn in ipairs(listeners) do
+					task.spawn(fn, e)
+				end
+				saveSoon()
+				if userCb then
+					task.spawn(userCb, e)
+				end
+			end
+		end
+
+		obj = raw(Section, n)
+		if type(obj) ~= "table" then
+			return obj
+		end
+		obj.Type = kind
+		obj.Flag = flag
+		local row, titleLabel, descLabel = Section._lastRow, Section._lastTitle, Section._lastDesc
+		obj.Row = row
+
+		-- helpers every object gets
+		function obj:SetName(text)
+			if titleLabel then
+				titleLabel.Text = tostring(text)
+			end
+		end
+		function obj:SetDesc(text)
+			text = tostring(text or "")
+			if not (descLabel and row) then
+				return
+			end
+			descLabel.Text = text
+			if kind ~= "Label" then
+				local has = text ~= ""
+				descLabel.Visible = has
+				row.Size = UDim2.new(1, 0, 0, has and 52 or 40)
+				titleLabel.Position = UDim2.new(0, 14, 0, has and 9 or 0)
+				titleLabel.Size = has and UDim2.new(1, -200, 0, 18) or UDim2.new(1, -200, 1, 0)
+			end
+		end
+		function obj:SetVisible(v)
+			if row then
+				row.Visible = v ~= false
+			end
+		end
+		function obj:Destroy()
+			if row then
+				row:Destroy()
+			end
+			if flag ~= nil then
+				if MacUI.Flags[flag] == obj then
+					MacUI.Flags[flag] = nil
+				end
+				if MacUI.Options[flag] == obj then
+					MacUI.Options[flag] = nil
+				end
+				if MacUI.Toggles[flag] == obj then
+					MacUI.Toggles[flag] = nil
+				end
+				for i, f in ipairs(flagged) do
+					if f.obj == obj then
+						table.remove(flagged, i)
+						break
+					end
+				end
+			end
+		end
+		obj.Remove = obj.Destroy
+		-- Kavo-style updaters
+		function obj:UpdateButton(t)
+			obj:SetName(t)
+		end
+		function obj:UpdateToggle(t, st)
+			if t ~= nil and t ~= "" then
+				obj:SetName(t)
+			end
+			if st ~= nil and obj.SetSilent then
+				obj:SetSilent(st)
+			end
+		end
+		function obj:UpdateSlider(t, v)
+			if t ~= nil and t ~= "" then
+				obj:SetName(t)
+			end
+			if v ~= nil and obj.SetSilent then
+				obj:SetSilent(v)
+			end
+		end
+		function obj:UpdateDropdown(t)
+			obj:SetName(t)
+		end
+		obj.UpdateTextBox, obj.UpdateKeybind, obj.UpdateColorPicker = obj.UpdateDropdown, obj.UpdateDropdown, obj.UpdateDropdown
+		function obj:UpdateLabel(t)
+			if kind == "Label" then
+				obj:Set(t)
+			else
+				obj:SetName(t)
+			end
+		end
+		-- Linoria: Toggle:AddColorPicker / AddKeyPicker, Button:AddButton (each becomes its own row)
+		function obj:AddColorPicker(...)
+			return Section:AddColorPicker(...)
+		end
+		function obj:AddKeyPicker(...)
+			return Section:AddKeyPicker(...)
+		end
+		if kind == "Button" then
+			function obj:AddButton(...)
+				return Section:AddButton(...)
+			end
+			function obj:Set(text) -- Rayfield: ButtonObject:Set("new name")
+				obj:SetName(text)
+			end
+			return obj
+		elseif kind == "Label" then
+			local rawLabelSet = obj.Set
+			function obj:Set(v)
+				if type(v) == "table" then
+					if v.Title then
+						obj:SetName(v.Title)
+					end
+					v = firstNonNil(v.Content, v.Text, "")
+				end
+				rawLabelSet(obj, tostring(v))
+			end
+			obj.SetText, obj.SetValue = obj.Set, obj.Set
+			return obj
+		end
+
+		-- value controls
+		local rawSet, rawGet = obj.Set, obj.Get
+		local fires = not meta.native -- native Set is silent; the other libraries' Set runs the callback
+		local function applyValue(v, fire)
+			if kind == "Bind" and type(v) == "table" and typeof(v) ~= ENUMITEM then
+				if v[2] then
+					mode = string.lower(tostring(v[2]))
+				end
+				v = v[1]
+			end
+			rawSet(obj, toRaw(v))
+			local cur = rawGet(obj)
+			setFields(cur)
+			if fire then
+				if kind == "Bind" then
+					changed(cur and cur.Name or "None")
+				else
+					local e = ext(cur)
+					changed(e)
+					if userCb then
+						task.spawn(userCb, e)
+					end
+				end
+			end
+		end
+		function obj:Set(v)
+			applyValue(v, fires)
+		end
+		function obj:SetValue(v)
+			applyValue(v, true)
+		end
+		function obj:SetSilent(v)
+			applyValue(v, false)
+		end
+		obj.Fire = obj.SetValue
+		obj.GetValue = rawGet
+		function obj:OnChanged(fn)
+			table.insert(listeners, fn)
+			return {
+				Disconnect = function()
+					local i = table.find(listeners, fn)
+					if i then
+						table.remove(listeners, i)
+					end
+				end,
+			}
+		end
+		if kind == "Dropdown" then
+			local rawRefresh = obj.Refresh
+			obj.Values = n.Options
+			function obj:Refresh(list, keep)
+				obj.Values = list or {}
+				rawRefresh(obj, list, keep)
+				setFields(rawGet(obj))
+			end
+			obj.SetOptions, obj.SetValues = obj.Refresh, obj.Refresh
+		elseif kind == "Bind" then
+			obj.Mode = mode
+			function obj:GetState()
+				return mode == "always" or state
+			end
+		end
+		if kind == "Toggle" or kind == "Slider" or kind == "Dropdown" then
+			obj.SetText = obj.SetName
+		end
+
+		setFields(rawGet(obj))
+		if flag ~= nil then
+			MacUI.Flags[flag] = obj
+			MacUI.Options[flag] = obj
+			if kind == "Toggle" then
+				MacUI.Toggles[flag] = obj
+			end
+			table.insert(flagged, { name = tostring(flag), obj = obj, kind = kind })
+		end
+		return obj
+	end
+
 	local function makeSection(tab, o)
 		o = o or {}
-		local Section = { _count = 0 }
+		local Section = { _count = 0, _rowLog = {} }
 		tab._order += 1
 
 		local holder = New("Frame", {
@@ -1733,7 +2402,7 @@ local function buildWindow(opts)
 			else
 				themedIcon(sic, "Accent")
 			end
-			Label({
+			Section._titleLabel = Label({
 				Text = o.Title,
 				Font = Enum.Font.GothamBold,
 				AutomaticSize = Enum.AutomaticSize.Y,
@@ -1743,7 +2412,7 @@ local function buildWindow(opts)
 				Parent = head,
 			}, "Text")
 		elseif o.Title then
-			Label({
+			Section._titleLabel = Label({
 				Text = o.Title,
 				Font = Enum.Font.GothamBold,
 				AutomaticSize = Enum.AutomaticSize.Y,
@@ -1795,7 +2464,7 @@ local function buildWindow(opts)
 					Parent = row,
 				}), { BackgroundColor3 = "Stroke" })
 			end
-			Label({
+			local titleLabel = Label({
 				Text = title or "",
 				Font = Enum.Font.GothamMedium,
 				TextTruncate = Enum.TextTruncate.AtEnd,
@@ -1819,6 +2488,8 @@ local function buildWindow(opts)
 					tab.Name or "", o.Title or "", o.Desc or "", title or "", desc or "",
 				}, " ")),
 			})
+			Section._lastRow, Section._lastTitle, Section._lastDesc = row, titleLabel, descLabel
+			table.insert(Section._rowLog, row)
 			return row, descLabel
 		end
 
@@ -1871,7 +2542,32 @@ local function buildWindow(opts)
 		function Section:AddDropdown(d)
 			local row = newRow(d.Name, d.Desc)
 			local options = d.Options or {}
-			local value = d.Default or options[1]
+			local multi = d.Multi == true
+			local value -- a string, or an array of strings when Multi = true
+			if multi then
+				value = {}
+				if type(d.Default) == "table" then
+					for _, v in ipairs(d.Default) do
+						table.insert(value, v)
+					end
+				elseif d.Default ~= nil then
+					value = { d.Default }
+				end
+			else
+				value = d.Default or options[1]
+			end
+			local function display(v)
+				if multi then
+					return (#v == 0) and "None" or table.concat(v, ", ")
+				end
+				return tostring(v)
+			end
+			local function isSel(opt)
+				if multi then
+					return table.find(value, opt) ~= nil
+				end
+				return opt == value
+			end
 
 			local btn = themed(New("TextButton", {
 				Text = "",
@@ -1883,7 +2579,7 @@ local function buildWindow(opts)
 				Parent = row,
 			}, { Round(6), Stroke("Stroke") }), { BackgroundColor3 = "Field", BackgroundTransparency = "GlassField" })
 			local valueLabel = Label({
-				Text = tostring(value),
+				Text = display(value),
 				TextSize = 13,
 				TextTruncate = Enum.TextTruncate.AtEnd,
 				Position = UDim2.fromOffset(10, 0),
@@ -1897,8 +2593,15 @@ local function buildWindow(opts)
 
 			local obj = {}
 			local function set(v, silent)
+				if multi then
+					local copy = {}
+					for _, x in ipairs(v or {}) do
+						table.insert(copy, x)
+					end
+					v = copy
+				end
 				value = v
-				valueLabel.Text = tostring(v)
+				valueLabel.Text = display(v)
 				if not silent and d.Callback then
 					task.spawn(d.Callback, v)
 				end
@@ -1950,7 +2653,7 @@ local function buildWindow(opts)
 						Text = tostring(opt),
 						Font = Enum.Font.Gotham,
 						TextSize = 13,
-						TextColor3 = (opt == value) and Theme.Accent or Theme.Text,
+						TextColor3 = isSel(opt) and Theme.Accent or Theme.Text,
 						TextXAlignment = Enum.TextXAlignment.Left,
 						AutoButtonColor = false,
 						BackgroundColor3 = Theme.Selected,
@@ -1968,26 +2671,59 @@ local function buildWindow(opts)
 						item.BackgroundTransparency = 1
 					end)
 					item.Activated:Connect(function()
-						set(opt)
-						close()
+						if multi then
+							local on = table.find(value, opt) ~= nil
+							local cur = {}
+							for _, o2 in ipairs(options) do
+								local keep
+								if o2 == opt then
+									keep = not on
+								else
+									keep = table.find(value, o2) ~= nil
+								end
+								if keep then
+									table.insert(cur, o2)
+								end
+							end
+							set(cur)
+							item.TextColor3 = isSel(opt) and Theme.Accent or Theme.Text
+						else
+							set(opt)
+							close()
+						end
 					end)
 				end
 			end)
 
 			function obj:Set(v)
+				if multi and type(v) ~= "table" then
+					v = { v }
+				end
 				set(v, true)
 			end
 			function obj:Get()
+				if multi then
+					return table.clone(value)
+				end
 				return value
 			end
 			-- replace the option list (value is kept when it is still in the list)
 			function obj:Refresh(list, keepValue)
 				options = list or {}
-				if not keepValue and not table.find(options, value) then
+				if multi then
+					local keep = {}
+					for _, v in ipairs(value) do
+						if table.find(options, v) then
+							table.insert(keep, v)
+						end
+					end
+					set(keep, true)
+				elseif not keepValue and not table.find(options, value) then
 					set(options[1], true)
 				end
 			end
 			obj.SetOptions = obj.Refresh
+			obj.SetValues = obj.Refresh
 			return obj
 		end
 
@@ -2166,6 +2902,9 @@ local function buildWindow(opts)
 				if t.Callback then
 					task.spawn(t.Callback, box.Text)
 				end
+				if t.ClearAfter then
+					box.Text = ""
+				end
 			end)
 			local obj = { Instance = box }
 			function obj:Set(v)
@@ -2281,33 +3020,315 @@ local function buildWindow(opts)
 			return obj
 		end
 
-		-- every control also answers to the other naming styles (CreateToggle, Toggle, Input, Keybind, ...)
-		-- and accepts the other option names (Title/Text, CurrentValue, Values, Content, ...)
-		for kind, names in pairs(KIND_NAMES) do
-			local raw = Section["Add" .. kind]
-			local function method(self, o, ...)
-				local r = raw(self, normControl(kind, o), ...)
-				if type(r) == "table" then
-					r.SetValue = r.SetValue or r.Set
-					r.GetValue = r.GetValue or r.Get
-					r.SetText = r.SetText or r.Set
-				end
-				return r
+		function Section:AddColorPicker(c)
+			local row = newRow(c.Name, c.Desc)
+			local value = c.Default
+			if typeof(value) ~= COLOR3 then
+				value = Color3.new(1, 1, 1)
 			end
-			Section["Add" .. kind] = method
-			for _, n in ipairs(names) do
-				Section[n] = method
+			local swatch = New("TextButton", {
+				Text = "",
+				AutoButtonColor = false,
+				AnchorPoint = Vector2.new(1, 0.5),
+				Position = UDim2.new(1, -14, 0.5, 0),
+				Size = UDim2.fromOffset(46, 22),
+				BackgroundColor3 = value,
+				BorderSizePixel = 0,
+				Parent = row,
+			}, { Round(6), Stroke("Stroke") })
+			local function set(v, silent)
+				value = v
+				swatch.BackgroundColor3 = v
+				if not silent and c.Callback then
+					task.spawn(c.Callback, v)
+				end
+			end
+
+			swatch.Activated:Connect(function()
+				local catcher = New("TextButton", {
+					Text = "", BackgroundTransparency = 1, Size = UDim2.fromScale(1, 1), ZIndex = 50, Parent = gui,
+				})
+				local popW, popH = 190, 176
+				local abs, size = swatch.AbsolutePosition, swatch.AbsoluteSize
+				local screen = gui.AbsoluteSize
+				local x = math.clamp(abs.X + size.X - popW, 4, math.max(4, screen.X - popW - 4))
+				local y = abs.Y + size.Y + 4
+				if y + popH > screen.Y - 4 then
+					y = math.max(4, abs.Y - popH - 4)
+				end
+				local pop = New("Frame", {
+					Position = UDim2.fromOffset(x, y),
+					Size = UDim2.fromOffset(popW, popH),
+					BackgroundColor3 = Theme.Field,
+					BorderSizePixel = 0,
+					ZIndex = 51,
+					Parent = gui,
+				}, {
+					Round(8),
+					New("UIStroke", { Color = Theme.Stroke, Thickness = 1, ApplyStrokeMode = Enum.ApplyStrokeMode.Border }),
+				})
+				local h, sat, val = value:ToHSV()
+				local sv = New("TextButton", {
+					Text = "", AutoButtonColor = false,
+					Position = UDim2.fromOffset(10, 10), Size = UDim2.fromOffset(170, 100),
+					BackgroundColor3 = Color3.fromHSV(h, 1, 1), BorderSizePixel = 0, ZIndex = 52, Parent = pop,
+				}, { Round(4) })
+				New("Frame", {
+					Size = UDim2.fromScale(1, 1), BackgroundColor3 = Color3.new(1, 1, 1), BorderSizePixel = 0,
+					ZIndex = 53, Parent = sv,
+				}, { Round(4), New("UIGradient", { Transparency = NumberSequence.new(0, 1) }) })
+				New("Frame", {
+					Size = UDim2.fromScale(1, 1), BackgroundColor3 = Color3.new(0, 0, 0), BorderSizePixel = 0,
+					ZIndex = 54, Parent = sv,
+				}, { Round(4), New("UIGradient", { Rotation = 90, Transparency = NumberSequence.new(1, 0) }) })
+				local svCur = New("Frame", {
+					AnchorPoint = Vector2.new(0.5, 0.5), Size = UDim2.fromOffset(10, 10),
+					BackgroundTransparency = 1, ZIndex = 55, Parent = sv,
+				}, { Round(5), New("UIStroke", { Color = Color3.new(1, 1, 1), Thickness = 2 }) })
+
+				local stops = {}
+				for i = 0, 6 do
+					table.insert(stops, ColorSequenceKeypoint.new(i / 6, Color3.fromHSV(math.min(i / 6, 0.999), 1, 1)))
+				end
+				local hue = New("TextButton", {
+					Text = "", AutoButtonColor = false,
+					Position = UDim2.fromOffset(10, 118), Size = UDim2.fromOffset(170, 12),
+					BackgroundColor3 = Color3.new(1, 1, 1), BorderSizePixel = 0, ZIndex = 52, Parent = pop,
+				}, { Round(6), New("UIGradient", { Color = ColorSequence.new(stops) }) })
+				local hueCur = New("Frame", {
+					AnchorPoint = Vector2.new(0.5, 0.5), Size = UDim2.fromOffset(4, 16),
+					BackgroundColor3 = Color3.new(1, 1, 1), BorderSizePixel = 0, ZIndex = 53, Parent = hue,
+				}, { Round(2), New("UIStroke", { Color = Color3.new(0, 0, 0), Thickness = 1 }) })
+
+				local hex = New("TextBox", {
+					Position = UDim2.fromOffset(10, 140), Size = UDim2.fromOffset(170, 26),
+					Text = hexOf(value), Font = Enum.Font.GothamMedium, TextSize = 13,
+					TextColor3 = Theme.Text, BackgroundColor3 = Theme.Card, ClearTextOnFocus = false,
+					BorderSizePixel = 0, ZIndex = 52, Parent = pop,
+				}, { Round(6) })
+
+				local function place()
+					sv.BackgroundColor3 = Color3.fromHSV(h, 1, 1)
+					svCur.Position = UDim2.fromScale(sat, 1 - val)
+					hueCur.Position = UDim2.fromScale(h, 0.5)
+				end
+				local function refresh()
+					place()
+					local col = Color3.fromHSV(h, sat, val)
+					hex.Text = hexOf(col)
+					set(col)
+				end
+				place()
+				local function fromSV(px, py)
+					local a, sz = sv.AbsolutePosition, sv.AbsoluteSize
+					sat = math.clamp((px - a.X) / math.max(sz.X, 1), 0, 1)
+					val = 1 - math.clamp((py - a.Y) / math.max(sz.Y, 1), 0, 1)
+					refresh()
+				end
+				local function fromHue(px)
+					local a, sz = hue.AbsolutePosition, hue.AbsoluteSize
+					h = math.clamp((px - a.X) / math.max(sz.X, 1), 0, 0.999)
+					refresh()
+				end
+				sv.InputBegan:Connect(function(input)
+					if isPress(input) then
+						activeSlider = fromSV
+						fromSV(input.Position.X, input.Position.Y)
+					end
+				end)
+				hue.InputBegan:Connect(function(input)
+					if isPress(input) then
+						activeSlider = fromHue
+						fromHue(input.Position.X)
+					end
+				end)
+				hex.FocusLost:Connect(function()
+					local r, g, b = string.match(hex.Text, "^#?(%x%x)(%x%x)(%x%x)$")
+					if r then
+						local col = Color3.fromRGB(tonumber(r, 16), tonumber(g, 16), tonumber(b, 16))
+						h, sat, val = col:ToHSV()
+						refresh()
+					else
+						hex.Text = hexOf(value)
+					end
+				end)
+				catcher.Activated:Connect(function()
+					activeSlider = nil
+					catcher:Destroy()
+					pop:Destroy()
+				end)
+			end)
+
+			local obj = {}
+			function obj:Set(v)
+				if typeof(v) == COLOR3 then
+					set(v, true)
+				elseif type(v) == "table" and v.R then
+					set(Color3.fromRGB(v.R, v.G or 0, v.B or 0), true)
+				end
+			end
+			function obj:Get()
+				return value
+			end
+			return obj
+		end
+
+		local function addDivider()
+			Section._count += 1
+			local row = New("Frame", {
+				BackgroundTransparency = 1, Size = UDim2.new(1, 0, 0, 10), LayoutOrder = Section._count, Parent = card,
+			})
+			themed(New("Frame", {
+				AnchorPoint = Vector2.new(0, 0.5), Position = UDim2.new(0, 14, 0.5, 0),
+				Size = UDim2.new(1, -28, 0, 1), BorderSizePixel = 0, Parent = row,
+			}), { BackgroundColor3 = "Stroke" })
+			table.insert(Section._rowLog, row)
+			return { Row = row, Destroy = function() row:Destroy() end }
+		end
+		local function addBlank(_, h)
+			Section._count += 1
+			local row = New("Frame", {
+				BackgroundTransparency = 1, Size = UDim2.new(1, 0, 0, tonumber(h) or 8),
+				LayoutOrder = Section._count, Parent = card,
+			})
+			table.insert(Section._rowLog, row)
+			return { Row = row, Destroy = function() row:Destroy() end }
+		end
+		for _, nm in ipairs(DIVIDER_NAMES) do
+			Section[nm] = addDivider
+		end
+		for _, nm in ipairs(BLANK_NAMES) do
+			Section[nm] = addBlank
+		end
+		-- Rayfield: SectionObject:Set("new name")
+		function Section:Set(text)
+			if Section._titleLabel then
+				Section._titleLabel.Text = tostring(text)
 			end
 		end
+
+		-- every control answers to every naming / argument style (see KIND_NAMES and parseControl)
+		local rawControls = {}
+		for kind in pairs(KIND_NAMES) do
+			rawControls[kind] = Section["Add" .. kind]
+		end
+		local function dispatch(kind, nameUsed, ...)
+			local n, meta = parseControl(kind, nameUsed, ...)
+			return wrapControl(Section, kind, n, meta, rawControls[kind])
+		end
+		for kind, names in pairs(KIND_NAMES) do
+			local function install(nm)
+				Section[nm] = function(_, ...)
+					return dispatch(kind, nm, ...)
+				end
+			end
+			install("Add" .. kind)
+			for _, nm in ipairs(names) do
+				install(nm)
+			end
+		end
+
+		-- Venyx updaters: section:updateToggle(control, title, value) ...
+		local function rename(ctl, title)
+			if type(ctl) == "table" and title ~= nil and ctl.SetName then
+				ctl:SetName(title)
+			end
+		end
+		function Section:updateButton(ctl, title)
+			rename(ctl, title)
+		end
+		function Section:updateToggle(ctl, title, value)
+			rename(ctl, title)
+			if value ~= nil and ctl and ctl.SetSilent then
+				ctl:SetSilent(value)
+			end
+		end
+		function Section:updateSlider(ctl, title, value)
+			rename(ctl, title)
+			if value ~= nil and ctl and ctl.SetSilent then
+				ctl:SetSilent(value)
+			end
+		end
+		function Section:updateDropdown(ctl, title, list)
+			rename(ctl, title)
+			if list and ctl and ctl.Refresh then
+				ctl:Refresh(list)
+			end
+		end
+		function Section:updateKeybind(ctl, title, key)
+			rename(ctl, title)
+			if key ~= nil and ctl and ctl.SetSilent then
+				ctl:SetSilent(key)
+			end
+		end
+		function Section:updateColorPicker(ctl, title, color)
+			rename(ctl, title)
+			if color ~= nil and ctl and ctl.SetSilent then
+				ctl:SetSilent(color)
+			end
+		end
+
+		-- Linoria / Obsidian: groupbox:AddDependencyBox() + box:SetupDependencies({ { Toggles.X, true } })
+		function Section:AddDependencyBox()
+			local rows = {}
+			local box = {}
+			setmetatable(box, {
+				__index = function(_, k)
+					local f = Section[k]
+					if type(f) ~= "function" then
+						return nil
+					end
+					return function(_, ...)
+						local before = #Section._rowLog
+						local r = f(Section, ...)
+						for i = before + 1, #Section._rowLog do
+							table.insert(rows, Section._rowLog[i])
+						end
+						return r
+					end
+				end,
+			})
+			function box:SetupDependencies(deps)
+				local function eval()
+					local show = true
+					for _, d in ipairs(deps or {}) do
+						if d[1] and d[1].Value ~= d[2] then
+							show = false
+						end
+					end
+					for _, r in ipairs(rows) do
+						r.Visible = show
+					end
+				end
+				for _, d in ipairs(deps or {}) do
+					if d[1] and d[1].OnChanged then
+						d[1]:OnChanged(eval)
+					end
+				end
+				eval()
+			end
+			return box
+		end
+		-- media rows have no equivalent here: accepted and ignored
+		function Section:AddImage()
+			return {}
+		end
+		Section.AddVideo = Section.AddImage
 
 		return Section
 	end
 
-	function Window:AddTab(o)
+	function Window:AddTab(o, icon2)
 		if type(o) == "string" then
 			o = { Name = o }
+			if icon2 ~= nil and type(icon2) ~= "table" then
+				o.Icon = icon2
+			end
 		end
 		o = copyTable(o or {})
+		if type(o.Icon) == "number" then
+			o.Icon = tostring(o.Icon)
+		end
 		o.Name = tostring(firstNonNil(o.Name, o.Title, o.Text, "Tab"))
 		local group
 		if o.Section then
@@ -2404,32 +3425,60 @@ local function buildWindow(opts)
 			Name = o.Name, Btn = btn, Text = text, Icon = icon, Bar = bar, NoTint = o.NoTint,
 			Page = page, _sections = {}, _order = 0, HasMatch = true,
 		}
-		function Tab:AddSection(so)
+		function Tab:AddSection(so, icon2)
 			if type(so) == "string" then
 				so = { Title = so }
+				if type(icon2) == "string" then
+					so.Icon = icon2
+				end
 			end
 			local c = copyTable(so or {})
 			c.Title = firstNonNil(c.Title, c.Name, c.Text)
 			c.Desc = firstNonNil(c.Desc, c.Description)
-			return makeSection(Tab, c)
+			local sec = makeSection(Tab, c)
+			Tab._current = sec
+			return sec
 		end
-		Tab.CreateSection = Tab.AddSection
-		Tab.NewSection = Tab.AddSection
-		Tab.Section = Tab.AddSection
+		for _, nm in ipairs(SECTION_NAMES) do
+			Tab[nm] = Tab.AddSection
+		end
 
-		-- controls called directly on the tab (Tab:Button, Tab:Toggle, ...) go into an untitled section
-		local looseSection
+		-- Linoria: Tab:AddTabbox() / tabbox:AddTab("name") -> one section per tab
+		local function newTabbox()
+			local tb = { Tabs = {} }
+			function tb:AddTab(name)
+				local sec = Tab:AddSection({ Title = tostring(name) })
+				tb.Tabs[name] = sec
+				return sec
+			end
+			return tb
+		end
+		Tab.AddTabbox, Tab.AddLeftTabbox, Tab.AddRightTabbox = newTabbox, newTabbox, newTabbox
+
+		-- controls called on the tab itself go into the newest section (Rayfield: CreateSection then CreateButton ...)
+		local function current()
+			if not Tab._current then
+				Tab._current = makeSection(Tab, {})
+			end
+			return Tab._current
+		end
+		local function route(nm)
+			Tab[nm] = function(_, ...)
+				local sec = current()
+				return sec[nm](sec, ...)
+			end
+		end
 		for kind, names in pairs(KIND_NAMES) do
-			local function method(self, o, ...)
-				if not looseSection then
-					looseSection = makeSection(Tab, {})
-				end
-				return looseSection["Add" .. kind](looseSection, o, ...)
+			route("Add" .. kind)
+			for _, nm in ipairs(names) do
+				route(nm)
 			end
-			Tab["Add" .. kind] = method
-			for _, n in ipairs(names) do
-				Tab[n] = method
-			end
+		end
+		for _, nm in ipairs(DIVIDER_NAMES) do
+			route(nm)
+		end
+		for _, nm in ipairs(BLANK_NAMES) do
+			route(nm)
 		end
 		table.insert(tabsList, Tab)
 		if group then
@@ -2451,10 +3500,9 @@ local function buildWindow(opts)
 		refreshCurrent()
 		return Tab
 	end
-	Window.CreateTab = Window.AddTab
-	Window.MakeTab = Window.AddTab
-	Window.NewTab = Window.AddTab
-	Window.Tab = Window.AddTab
+	for _, nm in ipairs(TAB_NAMES) do
+		Window[nm] = Window.AddTab
+	end
 
 	-- Window:Section(...) without a tab: goes into an automatic "Main" tab
 	local defaultTab
@@ -2464,10 +3512,33 @@ local function buildWindow(opts)
 		end
 		return defaultTab
 	end
-	for _, n in ipairs({ "AddSection", "CreateSection", "NewSection", "Section" }) do
-		Window[n] = function(self, so)
-			return defTab():AddSection(so)
+	for _, nm in ipairs(SECTION_NAMES) do
+		Window[nm] = function(_, so, icon2)
+			return defTab():AddSection(so, icon2)
 		end
+	end
+	-- controls called on the window itself (Wally style: window:Toggle(...), window:Button(...)) go into the
+	-- automatic tab, under the newest section
+	local function routeWin(nm)
+		if Window[nm] ~= nil or nm == "Toggle" then
+			return
+		end
+		Window[nm] = function(_, ...)
+			local t = defTab()
+			return t[nm](t, ...)
+		end
+	end
+	for kind, names in pairs(KIND_NAMES) do
+		routeWin("Add" .. kind)
+		for _, nm in ipairs(names) do
+			routeWin(nm)
+		end
+	end
+	for _, nm in ipairs(DIVIDER_NAMES) do
+		routeWin(nm)
+	end
+	for _, nm in ipairs(BLANK_NAMES) do
+		routeWin(nm)
 	end
 
 	-- settings tab (theme, glass, accent, size)
@@ -2644,8 +3715,13 @@ local function buildWindow(opts)
 			confirm.Visible = true
 		end
 	end
-	function Window:Toggle()
+	function Window:Toggle(...)
+		if select("#", ...) > 0 then -- Window:Toggle("name", ...) is a switch control (Wally style)
+			local t = defTab()
+			return t:Toggle(...)
+		end
 		toggleMain()
+		return nil
 	end
 	function Window:SetVisible(v)
 		if main.Visible ~= (v == true) then
@@ -2675,6 +3751,169 @@ local function buildWindow(opts)
 	function Window:GetToggleKey()
 		return toggleKey
 	end
+
+	-- Window:SelectTab(2) / ("name") / (tab)   (also SelectPage)
+	function Window:SelectTab(x)
+		local tab
+		if type(x) == "number" then
+			tab = tabsList[x]
+		elseif type(x) == "string" then
+			for _, t in ipairs(tabsList) do
+				if t.Name == x then
+					tab = t
+				end
+			end
+		elseif type(x) == "table" then
+			tab = x
+		end
+		if tab and tab.Page then
+			selectTab(tab)
+		end
+	end
+	Window.SelectPage = Window.SelectTab
+	function Window:Minimize()
+		toggleMain()
+	end
+
+	-- Fluent: Window:Dialog({ Title, Content, Buttons = { { Title, Callback }, ... } })
+	function Window:Dialog(o)
+		o = o or {}
+		local overlay = New("TextButton", {
+			Text = "", AutoButtonColor = false, BackgroundColor3 = Color3.new(0, 0, 0), BackgroundTransparency = 0.5,
+			BorderSizePixel = 0, Size = UDim2.fromScale(1, 1), ZIndex = 200, Parent = gui,
+		})
+		local card = New("Frame", {
+			AnchorPoint = Vector2.new(0.5, 0.5), Position = UDim2.fromScale(0.5, 0.5),
+			Size = UDim2.fromOffset(300, 0), AutomaticSize = Enum.AutomaticSize.Y,
+			BackgroundColor3 = Theme.Card, BorderSizePixel = 0, ZIndex = 201, Parent = overlay,
+		}, {
+			Round(10),
+			New("UIStroke", { Color = Theme.Stroke, Thickness = 1, ApplyStrokeMode = Enum.ApplyStrokeMode.Border }),
+			New("UIListLayout", { Padding = UDim.new(0, 10), SortOrder = Enum.SortOrder.LayoutOrder }),
+			New("UIPadding", {
+				PaddingLeft = UDim.new(0, 16), PaddingRight = UDim.new(0, 16),
+				PaddingTop = UDim.new(0, 16), PaddingBottom = UDim.new(0, 16),
+			}),
+		})
+		local function text(str, size, color, font, order)
+			New("TextLabel", {
+				BackgroundTransparency = 1, Text = tostring(str), Font = font, TextSize = size, TextColor3 = color,
+				TextXAlignment = Enum.TextXAlignment.Left, TextWrapped = true, AutomaticSize = Enum.AutomaticSize.Y,
+				Size = UDim2.new(1, 0, 0, 0), LayoutOrder = order, ZIndex = 202, Parent = card,
+			})
+		end
+		text(firstNonNil(o.Title, o.Name, "Dialog"), 15, Theme.Text, Enum.Font.GothamBold, 1)
+		local body = firstNonNil(o.Content, o.Text, o.Description)
+		if body then
+			text(body, 13, Theme.SubText, Enum.Font.Gotham, 2)
+		end
+		local buttons = o.Buttons or { { Title = "OK" } }
+		local rowFrame = New("Frame", {
+			BackgroundTransparency = 1, Size = UDim2.new(1, 0, 0, 30), LayoutOrder = 3, ZIndex = 202, Parent = card,
+		}, {
+			New("UIListLayout", {
+				FillDirection = Enum.FillDirection.Horizontal, Padding = UDim.new(0, 8),
+				SortOrder = Enum.SortOrder.LayoutOrder,
+			}),
+		})
+		local w = math.floor((268 - 8 * (#buttons - 1)) / math.max(#buttons, 1))
+		for i, b in ipairs(buttons) do
+			local btn = New("TextButton", {
+				Text = tostring(firstNonNil(b.Title, b.Name, b.Text, "OK")), Font = Enum.Font.GothamMedium, TextSize = 13,
+				TextColor3 = (i == 1) and Color3.new(1, 1, 1) or Theme.Text,
+				BackgroundColor3 = (i == 1) and Theme.Accent or Theme.Field, AutoButtonColor = false,
+				BorderSizePixel = 0, Size = UDim2.fromOffset(w, 30), LayoutOrder = i, ZIndex = 203, Parent = rowFrame,
+			}, { Round(6) })
+			btn.Activated:Connect(function()
+				overlay:Destroy()
+				local cb = firstNonNil(b.Callback, b.Function, b.Func)
+				if cb then
+					task.spawn(cb)
+				end
+			end)
+		end
+		return { Close = function() overlay:Destroy() end }
+	end
+
+	-- config files (Rayfield ConfigurationSaving / Orion SaveConfig): every control with a flag / idx is saved
+	local cfg = opts.ConfigurationSaving
+	local cfgOn = (type(cfg) == "table" and cfg.Enabled == true) or opts.SaveConfig == true
+	Window._cfgOn = cfgOn
+	local function configFile(name)
+		local folder = tostring(firstNonNil(type(cfg) == "table" and cfg.FolderName or nil, opts.ConfigFolder, "MacUI"))
+		local file = tostring(name or firstNonNil(type(cfg) == "table" and cfg.FileName or nil, opts.Title, "config"))
+		file = string.gsub(file, "[^%w%-_ ]", "_")
+		return folder, folder .. "/" .. file .. ".json"
+	end
+	local function encodeValue(kind, v)
+		if kind == "ColorPicker" and v then
+			return { R = math.floor(v.R * 255 + 0.5), G = math.floor(v.G * 255 + 0.5), B = math.floor(v.B * 255 + 0.5) }
+		elseif kind == "Bind" then
+			return (not v or v == Enum.KeyCode.Unknown) and "None" or v.Name
+		end
+		return v
+	end
+	local function decodeValue(kind, v)
+		if kind == "ColorPicker" and type(v) == "table" then
+			return Color3.fromRGB(v.R or 255, v.G or 255, v.B or 255)
+		elseif kind == "Bind" then
+			return (v ~= "None") and toKeyCode(v) or false
+		end
+		return v
+	end
+	function Window:SaveConfig(name)
+		if not writefile then
+			return false
+		end
+		local data = {}
+		for _, f in ipairs(flagged) do
+			data[f.name] = encodeValue(f.kind, f.obj:Get())
+		end
+		return (pcall(function()
+			local folder, path = configFile(name)
+			if makefolder and isfolder and not isfolder(folder) then
+				makefolder(folder)
+			end
+			writefile(path, game:GetService("HttpService"):JSONEncode(data))
+		end))
+	end
+	function Window:LoadConfig(name)
+		if not (readfile and isfile) then
+			return false
+		end
+		local ok, data = pcall(function()
+			local _, path = configFile(name)
+			if not isfile(path) then
+				return nil
+			end
+			return game:GetService("HttpService"):JSONDecode(readfile(path))
+		end)
+		if not ok or type(data) ~= "table" then
+			return false
+		end
+		for _, f in ipairs(flagged) do
+			local v = data[f.name]
+			if v ~= nil then
+				pcall(function()
+					f.obj:SetValue(decodeValue(f.kind, v))
+				end)
+			end
+		end
+		return true
+	end
+	if cfgOn then
+		local token = 0
+		saveSoon = function()
+			token += 1
+			local my = token
+			task.delay(0.4, function()
+				if my == token and not destroyed then
+					Window:SaveConfig()
+				end
+			end)
+		end
+	end
+
 	function Window:SetUser(t)
 		for k, v in pairs(t or {}) do
 			userInfo[k] = v
@@ -2684,8 +3923,11 @@ local function buildWindow(opts)
 	function Window:ToggleSidebar()
 		onToggleSidebar()
 	end
-	function Window.Notify(a, b)
-		return MacUI.Notify((a == Window) and b or a)
+	function Window.Notify(a, ...)
+		if a == Window then
+			return MacUI.Notify(...)
+		end
+		return MacUI.Notify(a, ...)
 	end
 
 	onPress(red, function()
@@ -2726,15 +3968,93 @@ local function buildWindow(opts)
 end
 
 -- Library.CreateWindow(opts) / Library:CreateWindow(opts) / Library:Window(opts) all work
-function MacUI.CreateWindow(a, b)
-	local o = a
-	if a == MacUI then
-		o = b
+function MacUI.CreateWindow(...)
+	local a, b = unself(...)
+	local o
+	if type(a) == "table" then
+		o = a
+	elseif type(a) == "string" then -- CreateLib("Title", "Theme") / new("Title", themeTable) / CreateWindow("Title")
+		o = { Title = a }
+		if b ~= nil and type(b) ~= "function" then
+			o.Theme = b
+		end
+	else
+		o = {}
 	end
 	return buildWindow(o)
 end
-for _, n in ipairs({ "Window", "MakeWindow", "NewWindow", "Create", "CreateLib" }) do
+for _, n in ipairs({ "Window", "MakeWindow", "NewWindow", "Create", "CreateLib", "new", "New" }) do
 	MacUI[n] = MacUI.CreateWindow
 end
+
+local function lastWindow()
+	return MacUI._windows[#MacUI._windows]
+end
+-- config: Orion Init(), Rayfield LoadConfiguration(), SaveConfiguration()
+function MacUI.LoadConfiguration()
+	for _, w in ipairs(MacUI._windows) do
+		if w._cfgOn then
+			w:LoadConfig()
+		end
+	end
+end
+function MacUI.SaveConfiguration()
+	for _, w in ipairs(MacUI._windows) do
+		if w._cfgOn then
+			w:SaveConfig()
+		end
+	end
+end
+function MacUI.Init()
+	MacUI.LoadConfiguration()
+end
+MacUI.MakeNotification = MacUI.Notify
+function MacUI.Unload()
+	MacUI.Destroy()
+end
+function MacUI.OnUnload(...)
+	local fn = unself(...)
+	if type(fn) == "function" then
+		table.insert(MacUI._onUnload, fn)
+	end
+end
+function MacUI.Toggle()
+	local w = lastWindow()
+	if w then
+		w:Toggle()
+	end
+end
+function MacUI.SetVisibility(...)
+	local v = unself(...)
+	local w = lastWindow()
+	if w then
+		w:SetVisible(v ~= false)
+	end
+end
+function MacUI.IsVisible()
+	local w = lastWindow()
+	return w ~= nil and w:IsVisible()
+end
+function MacUI.SetTheme(...)
+	local name = unself(...)
+	local w = lastWindow()
+	if w and type(name) == "string" then
+		local m = ThemeMap[string.lower(name)]
+		w:SetTheme((m and m[1]) or name)
+		if m and m[2] then
+			w:SetAccent(Accents[m[2]])
+		end
+	end
+end
+-- cosmetic features of other libraries that have no equivalent here: accepted and ignored
+for _, n in ipairs({
+	"SetWatermark", "SetWatermarkVisibility", "SetFont", "SetLoadingText", "UpdateColorsUsingRegistry",
+	"RefreshConfigList", "SetKeybindFrame", "ToggleKeybindFrame",
+}) do
+	MacUI[n] = function() end
+end
+MacUI.KeybindFrame = { Visible = false }
+MacUI.Watermark = { Visible = false }
+MacUI.Unloaded = false
 
 return MacUI
