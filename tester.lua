@@ -402,7 +402,7 @@ local function UpdateTimeLabel()
     local Minutes = math.floor((Remaining % 3600) / 60)
     local Seconds = Remaining % 60 -- คำนวณวินาที
 
-    local Text =
+    local addText =
         "เหลือเวลา " ..
         tostring(Days) .. " วัน " ..
         tostring(Hours) .. " ชั่วโมง " ..
