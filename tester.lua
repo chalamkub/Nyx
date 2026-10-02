@@ -61,15 +61,32 @@ end
 
 print("Whitelist verified!")
 
-local expireAt = os.time() + 23 * 3600 + 53 * 60  -- ใส่เวลาหมดอายุจริงจากระบบคีย์
-task.spawn(function()
-    while table.find(MacUI._windows, Window) do  -- หยุดเองเมื่อปิด UI
-        local left = math.max(expireAt - os.time(), 0)
-        Window:SetUserNote(string.format('Expires: <font color="#FF8A3D">%dh %dm</font>',
-            math.floor(left / 3600), math.floor(left % 3600 / 60)))
-        task.wait(30)
+local RemainingSeconds = tonumber(
+    Data.key and Data.key.remaining_seconds
+)
+
+local function FormatTime(seconds)
+    seconds = math.max(0, math.floor(seconds))
+
+    local days = math.floor(seconds / 86400)
+    seconds = seconds % 86400
+
+    local hours = math.floor(seconds / 3600)
+    seconds = seconds % 3600
+
+    local minutes = math.floor(seconds / 60)
+    local secs = seconds % 60
+
+    if days > 0 then
+        return string.format("%dd %02dh %02dm", days, hours, minutes)
+    elseif hours > 0 then
+        return string.format("%dh %02dm", hours, minutes)
+    elseif minutes > 0 then
+        return string.format("%dm %02ds", minutes, secs)
+    else
+        return string.format("%ds", secs)
     end
-end)
+end
 
 -- ใส่โค้ดสคริปต์หลักของคุณต่อจากตรงนี้
 
