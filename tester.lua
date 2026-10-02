@@ -59,8 +59,6 @@ if Data.success ~= true then
     return
 end
 
-print("Whitelist verified!")
-
 local RemainingSeconds = tonumber(
     Data.key and Data.key.remaining_seconds
 )
@@ -547,7 +545,8 @@ end
 
 -- ── 7. MACUI LIBRARY IMPLEMENTATION (NYX EDITION) ───────────────────────────────
 local MacLib = loadstring(game:HttpGet("https://raw.githubusercontent.com/chalamkub/Nyx/refs/heads/main/MacUI_Library_v2.lua"))()
-
+local KeyTimeText = "Key: " .. FormatTime(RemainingSeconds or 0)
+                
 local Window = MacLib:Window({
     Title = "2K SCRIPT",
     Subtitle = "Fisch Hub - Powered by Nyx",
