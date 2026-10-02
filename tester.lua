@@ -469,11 +469,3 @@ print("Whitelist: ACTIVE")
 print("Expires:", ExpiresAt)
 
 print("======================================")
-
-Loader ใช้:
-
-getgenv().Key = "9278B322-7FE4EF32-B18C4968"
-
-loadstring(game:HttpGet(
-    "https://raw.githubusercontent.com/chalamkub/Nyx/refs/heads/main/tester.lua"
-))()
