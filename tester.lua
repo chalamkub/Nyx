@@ -1,6 +1,6 @@
 --==================================================
 -- NYX WHITELIST TESTER
--- Key + HWID + Profile Countdown
+-- Key + HWID + Profile Countdown + Safe UI Load
 --==================================================
 
 local Players = game:GetService("Players")
@@ -105,13 +105,10 @@ local ok, err = pcall(function()
 
     Response = RequestFunction({
         Url = API_URL,
-
         Method = "POST",
-
         Headers = {
             ["Content-Type"] = "application/json"
         },
-
         Body = HttpService:JSONEncode({
             key = Key,
             hwid = HWID
@@ -151,14 +148,12 @@ end
 
 
 if Data.success ~= true then
-
     LocalPlayer:Kick(
         tostring(
             Data.message
             or "Whitelist verification failed"
         )
     )
-
     return
 end
 
@@ -212,24 +207,36 @@ end
 
 
 --==================================================
--- LOAD MACUI
+-- LOAD MACUI (FIXED - แบบปลอดภัยป้องกัน nil)
 --==================================================
 
 local MacUI
 
-local LibraryOK = pcall(function()
-
-    MacUI = loadstring(
-        game:HttpGet(MACUI_URL)
-    )()
-
+local success, result = pcall(function()
+    return game:HttpGet(MACUI_URL)
 end)
 
-
-if not LibraryOK or not MacUI then
-    LocalPlayer:Kick("Failed to load MacUI Library")
+if not success or not result or result:match("404: Not Found") then
+    LocalPlayer:Kick("Failed to download MacUI Library: ลิงก์เสียหรือเน็ตมีปัญหา")
     return
 end
+
+local loadedFunc, loadErr = loadstring(result)
+if type(loadedFunc) ~= "function" then
+    LocalPlayer:Kick("Failed to compile MacUI: โค้ดในลิงก์ไม่ถูกต้อง (" .. tostring(loadErr) .. ")")
+    return
+end
+
+local LibraryOK, UIResult = pcall(function()
+    return loadedFunc()
+end)
+
+if not LibraryOK then
+    LocalPlayer:Kick("Error running MacUI Library")
+    return
+end
+
+MacUI = UIResult
 
 
 --==================================================
@@ -237,15 +244,10 @@ end
 --==================================================
 
 local Window = MacUI:MakeWindow({
-
     Name = "My Premium Script",
-
     HidePremium = false,
-
     SaveConfig = true,
-
     ConfigFolder = "MyScriptConfig"
-
 })
 
 
@@ -254,13 +256,9 @@ local Window = MacUI:MakeWindow({
 --==================================================
 
 local MainTab = Window:MakeTab({
-
     Name = "Main",
-
     Icon = "rbxassetid://4483345998",
-
     PremiumOnly = false
-
 })
 
 
@@ -269,17 +267,12 @@ local MainTab = Window:MakeTab({
 --==================================================
 
 pcall(function()
-
     MainTab:AddParagraph({
-
         Title = "Profile",
-
         Content =
             "Key: " .. Key ..
             "\nสถานะ: Whitelisted"
-
     })
-
 end)
 
 
@@ -295,82 +288,39 @@ task.wait(0.5)
 --==================================================
 
 local function FindProfileContainer()
-
     local PlayerGui =
         LocalPlayer:WaitForChild("PlayerGui")
 
     local PossibleNames = {
-
-        "Profile",
-        "profile",
-
-        "User",
-        "user",
-
-        "UserProfile",
-        "UserInfo",
-
-        "Player",
-        "PlayerProfile",
-
-        "ProfileFrame",
-        "UserFrame",
-
-        "Account",
-        "AccountFrame"
-
+        "Profile", "profile",
+        "User", "user",
+        "UserProfile", "UserInfo",
+        "Player", "PlayerProfile",
+        "ProfileFrame", "UserFrame",
+        "Account", "AccountFrame"
     }
 
-
-    -- หาโดยชื่อก่อน
     for _, gui in ipairs(PlayerGui:GetDescendants()) do
-
-        if gui:IsA("Frame")
-            or gui:IsA("ScrollingFrame")
-            or gui:IsA("CanvasGroup")
-        then
-
+        if gui:IsA("Frame") or gui:IsA("ScrollingFrame") or gui:IsA("CanvasGroup") then
             for _, name in ipairs(PossibleNames) do
-
                 if gui.Name == name then
                     return gui
                 end
-
             end
-
         end
-
     end
 
-
-    -- หา TextLabel ที่เขียน Profile/User
     for _, gui in ipairs(PlayerGui:GetDescendants()) do
-
-        if gui:IsA("TextLabel")
-            or gui:IsA("TextButton")
-        then
-
-            local text =
-                string.lower(
-                    tostring(gui.Text or "")
-                )
-
-            if text:find("profile")
-                or text:find("user")
-            then
-
+        if gui:IsA("TextLabel") or gui:IsA("TextButton") then
+            local text = string.lower(tostring(gui.Text or ""))
+            if text:find("profile") or text:find("user") then
                 local parent = gui.Parent
-
                 if parent then
                     return parent
                 end
-
             end
-
         end
-
     end
-
 
     return nil
 end
@@ -380,60 +330,32 @@ end
 -- CREATE COUNTDOWN
 --==================================================
 
-local ProfileContainer =
-    FindProfileContainer()
+local ProfileContainer = FindProfileContainer()
 
 
 --==================================================
--- FALLBACK (FIXED)
+-- FALLBACK (FIXED - สร้าง ScreenGui)
 --==================================================
 
 if not ProfileContainer then
-
-    local PlayerGui =
-        LocalPlayer:WaitForChild("PlayerGui")
+    local PlayerGui = LocalPlayer:WaitForChild("PlayerGui")
         
-    -- สร้าง ScreenGui สำหรับเก็บ UI
     local ScreenGui = Instance.new("ScreenGui")
     ScreenGui.Name = "NyxCountdownGui"
     
-    -- นำไปใส่ใน CoreGui หรือ gethui() เพื่อป้องกันการโดนแบน (ถ้าไม่ได้ก็ใส่ PlayerGui แทน)
     local targetParent = (typeof(gethui) == "function" and gethui()) 
         or game:GetService("CoreGui") 
         or PlayerGui
         
     pcall(function() ScreenGui.Parent = targetParent end)
 
-    ProfileContainer =
-        Instance.new("Frame")
-
-    ProfileContainer.Name =
-        "NyxProfileCountdown"
-
-    ProfileContainer.Parent =
-        ScreenGui -- ใส่ใน ScreenGui แทน
-
-    ProfileContainer.AnchorPoint =
-        Vector2.new(0, 1)
-
-    ProfileContainer.Position =
-        UDim2.new(
-            0,
-            15,
-            1,
-            -15
-        )
-
-    ProfileContainer.Size =
-        UDim2.new(
-            0,
-            300,
-            0,
-            45
-        )
-
-    ProfileContainer.BackgroundTransparency =
-        1
+    ProfileContainer = Instance.new("Frame")
+    ProfileContainer.Name = "NyxProfileCountdown"
+    ProfileContainer.Parent = ScreenGui
+    ProfileContainer.AnchorPoint = Vector2.new(0, 1)
+    ProfileContainer.Position = UDim2.new(0, 15, 1, -15)
+    ProfileContainer.Size = UDim2.new(0, 300, 0, 45)
+    ProfileContainer.BackgroundTransparency = 1
 end
 
 
@@ -441,81 +363,21 @@ end
 -- COUNTDOWN LABEL
 --==================================================
 
-local CountdownLabel =
-    Instance.new("TextLabel")
-
-
-CountdownLabel.Name =
-    "NyxCountdown"
-
-
-CountdownLabel.Parent =
-    ProfileContainer
-
-
-CountdownLabel.BackgroundTransparency =
-    1
-
-
-CountdownLabel.BorderSizePixel =
-    0
-
-
-CountdownLabel.Size =
-    UDim2.new(
-        1,
-        -10,
-        0,
-        30
-    )
-
-
-CountdownLabel.Position =
-    UDim2.new(
-        0,
-        5,
-        1,
-        -30
-    )
-
-
-CountdownLabel.AnchorPoint =
-    Vector2.new(
-        0,
-        0
-    )
-
-
-CountdownLabel.TextXAlignment =
-    Enum.TextXAlignment.Left
-
-
-CountdownLabel.TextYAlignment =
-    Enum.TextYAlignment.Center
-
-
-CountdownLabel.Font =
-    Enum.Font.GothamMedium
-
-
-CountdownLabel.TextSize =
-    13
-
-
-CountdownLabel.TextColor3 =
-    Color3.fromRGB(
-        255,
-        255,
-        255
-    )
-
-
-CountdownLabel.TextStrokeTransparency =
-    0.6
-
-
-CountdownLabel.Text =
-    "เหลือเวลา: กำลังโหลด..."
+local CountdownLabel = Instance.new("TextLabel")
+CountdownLabel.Name = "NyxCountdown"
+CountdownLabel.Parent = ProfileContainer
+CountdownLabel.BackgroundTransparency = 1
+CountdownLabel.BorderSizePixel = 0
+CountdownLabel.Size = UDim2.new(1, -10, 0, 30)
+CountdownLabel.Position = UDim2.new(0, 5, 1, -30)
+CountdownLabel.AnchorPoint = Vector2.new(0, 0)
+CountdownLabel.TextXAlignment = Enum.TextXAlignment.Left
+CountdownLabel.TextYAlignment = Enum.TextYAlignment.Center
+CountdownLabel.Font = Enum.Font.GothamMedium
+CountdownLabel.TextSize = 13
+CountdownLabel.TextColor3 = Color3.fromRGB(255, 255, 255)
+CountdownLabel.TextStrokeTransparency = 0.6
+CountdownLabel.Text = "เหลือเวลา: กำลังโหลด..."
 
 
 --==================================================
@@ -523,50 +385,17 @@ CountdownLabel.Text =
 --==================================================
 
 local function FormatTime(seconds)
-
-    seconds =
-        math.max(
-            0,
-            math.floor(seconds)
-        )
-
-
-    local days =
-        math.floor(
-            seconds / 86400
-        )
-
-
-    seconds =
-        seconds % 86400
-
-
-    local hours =
-        math.floor(
-            seconds / 3600
-        )
-
-
-    seconds =
-        seconds % 3600
-
-
-    local minutes =
-        math.floor(
-            seconds / 60
-        )
-
-
-    local secs =
-        seconds % 60
-
+    seconds = math.max(0, math.floor(seconds))
+    local days = math.floor(seconds / 86400)
+    seconds = seconds % 86400
+    local hours = math.floor(seconds / 3600)
+    seconds = seconds % 3600
+    local minutes = math.floor(seconds / 60)
+    local secs = seconds % 60
 
     return string.format(
         "%d วัน %d ชั่วโมง %d นาที %d วินาที",
-        days,
-        hours,
-        minutes,
-        secs
+        days, hours, minutes, secs
     )
 end
 
@@ -576,31 +405,17 @@ end
 --==================================================
 
 task.spawn(function()
-
     while true do
-
-        local remaining =
-            ExpireTimestamp - os.time()
-
+        local remaining = ExpireTimestamp - os.time()
 
         if remaining <= 0 then
-
-            CountdownLabel.Text =
-                "เหลือเวลา: หมดอายุแล้ว"
-
+            CountdownLabel.Text = "เหลือเวลา: หมดอายุแล้ว"
             break
         end
 
-
-        CountdownLabel.Text =
-            "เหลือเวลา: "
-            .. FormatTime(remaining)
-
-
+        CountdownLabel.Text = "เหลือเวลา: " .. FormatTime(remaining)
         task.wait(1)
-
     end
-
 end)
 
 
@@ -609,17 +424,10 @@ end)
 --==================================================
 
 MainTab:AddButton({
-
     Name = "ฟังก์ชันทำงาน",
-
     Callback = function()
-
-        print(
-            "[NYX] Script is working!"
-        )
-
+        print("[NYX] Script is working!")
     end
-
 })
 
 
@@ -627,34 +435,8 @@ MainTab:AddButton({
 -- DEBUG
 --==================================================
 
-print(
-    "[NYX] Whitelist verified"
-)
-
-print(
-    "[NYX] Key:",
-    Key
-)
-
-print(
-    "[NYX] HWID:",
-    HWID
-)
-
-print(
-    "[NYX] Expires:",
-    ExpiresAt
-)
-
-print(
-    "[NYX] Countdown:",
-    FormatTime(
-        ExpireTimestamp - os.time()
-    )
-
-print(
-    "[NYX] version 3:",
-    FormatTime(
-        ExpireTimestamp - os.time()
-    )
-)
+print("[NYX] Whitelist verified")
+print("[NYX] Key:", Key)
+print("[NYX] HWID:", HWID)
+print("[NYX] Expires:", ExpiresAt)
+print("[NYX] Countdown:", FormatTime(ExpireTimestamp - os.time()))
