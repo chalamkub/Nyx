@@ -68,6 +68,8 @@
 -- Profile (bottom of the sidebar): avatar + name of the local player. Options in CreateWindow:
 --   ShowUser = true, UserName = "text", UserId = 123, UserImage = "rbxassetid://...", MaskName = false (true -> "iM*****")
 --   Window:SetUser({ Name = "text", UserId = 123, Image = "id", Mask = true })
+--   Line under the name (e.g. key time left): CreateWindow({ UserNote = "text" }) or Window:SetUserNote("Expires: 23h 53m"),
+--     with a colour: Window:SetUserNote(text, Color3) ; RichText works too: 'Expires: <font color="#FF8A3D">23h 53m</font>' 
 -- Section icons: Tab:AddSection({ Title = "Bosses", Desc = "...", Icon = "star", IconColor = Color3.fromRGB(255, 82, 82) })
 --   Icon can be a built-in name, an image id, or an emoji (emoji keep their own colors).
 -- Icon values may also be an image id: "123" / "rbxassetid://123" / { Id = "123", Tint = false, Recolor = false }
@@ -1264,7 +1266,10 @@ local function buildWindow(opts)
 
 	-- profile: avatar + name at the bottom of the sidebar
 	local applyUser = function() end
-	local userInfo = { Name = opts.UserName, UserId = opts.UserId, Image = opts.UserImage, Mask = opts.MaskName }
+	local userInfo = {
+		Name = opts.UserName, UserId = opts.UserId, Image = opts.UserImage, Mask = opts.MaskName,
+		Note = opts.UserNote, NoteColor = opts.UserNoteColor,
+	}
 	if PROFILE_H > 0 then
 		themed(New("Frame", {
 			Name = "ProfileLine",
@@ -1276,7 +1281,7 @@ local function buildWindow(opts)
 		local avatar = themed(New("Frame", {
 			Name = "Avatar",
 			AnchorPoint = Vector2.new(0, 0.5),
-			Position = UDim2.new(0, 12, 1, -PROFILE_H / 2),
+			Position = UDim2.new(0, 10, 1, -PROFILE_H / 2),
 			Size = UDim2.fromOffset(32, 32),
 			BorderSizePixel = 0,
 			Parent = sideClip,
@@ -1302,10 +1307,22 @@ local function buildWindow(opts)
 			TextSize = 13,
 			TextTruncate = Enum.TextTruncate.AtEnd,
 			AnchorPoint = Vector2.new(0, 0.5),
-			Position = UDim2.new(0, 52, 1, -PROFILE_H / 2),
-			Size = UDim2.fromOffset(SIDE - 52 - 10, 18),
+			Position = UDim2.new(0, 48, 1, -PROFILE_H / 2),
+			Size = UDim2.fromOffset(SIDE - 48 - 6, 18),
 			Parent = sideClip,
 		}, "Text")
+		-- second line under the name (key time left, status, ...): Window:SetUserNote("text")
+		local noteLabel = Label({
+			Text = "",
+			TextSize = 11,
+			RichText = true,
+			TextTruncate = Enum.TextTruncate.AtEnd,
+			AnchorPoint = Vector2.new(0, 0.5),
+			Position = UDim2.new(0, 48, 1, -PROFILE_H / 2 + 9),
+			Size = UDim2.fromOffset(SIDE - 48 - 6, 14),
+			Visible = false,
+			Parent = sideClip,
+		}, "SubText")
 		avatarImg:GetPropertyChangedSignal("IsLoaded"):Connect(function()
 			if avatarImg.IsLoaded and avatarImg.Image ~= "" then
 				letter.Visible = false
@@ -1327,6 +1344,15 @@ local function buildWindow(opts)
 					img = "rbxthumb://type=AvatarHeadShot&id=" .. uid .. "&w=150&h=150"
 				end
 			end
+			-- note line: with a note the name moves up, without one the name stays centred
+			local note = userInfo.Note
+			note = (note ~= nil and note ~= false) and tostring(note) or ""
+			if note ~= "" and typeof(userInfo.NoteColor) == COLOR3 then
+				note = '<font color="' .. hexOf(userInfo.NoteColor) .. '">' .. note .. "</font>"
+			end
+			noteLabel.Text = note
+			noteLabel.Visible = note ~= ""
+			nameLabel.Position = UDim2.new(0, 48, 1, -PROFILE_H / 2 - (note ~= "" and 8 or 0))
 			letter.Visible = true
 			avatarImg.Image = img or ""
 			if img and avatarImg.IsLoaded then
@@ -3919,6 +3945,17 @@ local function buildWindow(opts)
 			userInfo[k] = v
 		end
 		applyUser()
+	end
+	-- text under the name at the bottom of the sidebar. Window:SetUserNote("Expires: 23h 53m")
+	-- colour for the whole line: SetUserNote(text, Color3); part of it: RichText such as <font color="#FF8A3D">23h</font>
+	-- SetUserNote("") or SetUserNote(nil) removes the line again
+	function Window:SetUserNote(text, color)
+		userInfo.Note = text
+		userInfo.NoteColor = color
+		applyUser()
+	end
+	function Window:GetUserNote()
+		return userInfo.Note
 	end
 	function Window:ToggleSidebar()
 		onToggleSidebar()
