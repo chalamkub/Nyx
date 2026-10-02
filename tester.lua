@@ -1,3 +1,4 @@
+```lua
 --// =========================================
 --// NYX WHITELIST LOADER
 --// Key + HWID Verification
@@ -376,50 +377,87 @@ end)
 
 
 --// =========================
---// UPDATE LABEL (แก้เพิ่มวินาที)
+--// UPDATE LABEL
 --// =========================
 
 local function UpdateTimeLabel()
 
-    local Remaining = ExpireTimestamp - os.time()
+    local Remaining =
+        ExpireTimestamp - os.time()
+
 
     --// หมดอายุ
+
     if Remaining <= 0 then
+
         if TimeLabel then
+
             pcall(function()
+
                 TimeLabel:Set({
+
                     Title = "Whitelist",
+
                     Content = "Key หมดอายุแล้ว"
+
                 })
+
             end)
+
         end
+
         return false
+
     end
+
 
     --// คำนวณเวลา
-    local Days = math.floor(Remaining / 86400)
-    local Hours = math.floor((Remaining % 86400) / 3600)
-    local Minutes = math.floor((Remaining % 3600) / 60)
-    local Seconds = Remaining % 60 -- คำนวณวินาที
 
-    local AddText =
+    local Days =
+        math.floor(Remaining / 86400)
+
+    local Hours =
+        math.floor(
+            (Remaining % 86400) / 3600
+        )
+
+    local Minutes =
+        math.floor(
+            (Remaining % 3600) / 60
+        )
+
+
+    local Text =
         "เหลือเวลา " ..
-        tostring(Days) .. " วัน " ..
-        tostring(Hours) .. " ชั่วโมง " ..
-        tostring(Minutes) .. " นาที " ..
-        tostring(Seconds) .. " วินาที"
+        tostring(Days) ..
+        " วัน " ..
+        tostring(Hours) ..
+        " ชั่วโมง " ..
+        tostring(Minutes) ..
+        " นาที"
+
 
     --// อัปเดต UI
+
     if TimeLabel then
+
         pcall(function()
+
             TimeLabel:Set({
+
                 Title = "Whitelist",
+
                 Content = Text
+
             })
+
         end)
+
     end
 
+
     return true
+
 end
 
 
@@ -431,19 +469,23 @@ UpdateTimeLabel()
 
 
 --// =========================
---// COUNTDOWN LOOP (แก้เป็น 1 วิ)
+--// COUNTDOWN LOOP
 --// =========================
 
 task.spawn(function()
+
     while true do
-        task.wait(1)
-        
+
+        task.wait(60)
+
         local Active = UpdateTimeLabel()
 
         if not Active then
             break
         end
+
     end
+
 end)
 
 
@@ -483,3 +525,4 @@ print(
 print(
     "[NYX] Expires: " .. tostring(ExpiresAt)
 )
+```
