@@ -385,13 +385,24 @@ local ProfileContainer =
 
 
 --==================================================
--- FALLBACK
+-- FALLBACK (FIXED)
 --==================================================
 
 if not ProfileContainer then
 
     local PlayerGui =
         LocalPlayer:WaitForChild("PlayerGui")
+        
+    -- สร้าง ScreenGui สำหรับเก็บ UI
+    local ScreenGui = Instance.new("ScreenGui")
+    ScreenGui.Name = "NyxCountdownGui"
+    
+    -- นำไปใส่ใน CoreGui หรือ gethui() เพื่อป้องกันการโดนแบน (ถ้าไม่ได้ก็ใส่ PlayerGui แทน)
+    local targetParent = (typeof(gethui) == "function" and gethui()) 
+        or game:GetService("CoreGui") 
+        or PlayerGui
+        
+    pcall(function() ScreenGui.Parent = targetParent end)
 
     ProfileContainer =
         Instance.new("Frame")
@@ -400,7 +411,7 @@ if not ProfileContainer then
         "NyxProfileCountdown"
 
     ProfileContainer.Parent =
-        PlayerGui
+        ScreenGui -- ใส่ใน ScreenGui แทน
 
     ProfileContainer.AnchorPoint =
         Vector2.new(0, 1)
@@ -637,6 +648,12 @@ print(
 
 print(
     "[NYX] Countdown:",
+    FormatTime(
+        ExpireTimestamp - os.time()
+    )
+
+print(
+    "[NYX] version 3:",
     FormatTime(
         ExpireTimestamp - os.time()
     )
