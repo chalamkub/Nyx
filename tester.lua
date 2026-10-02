@@ -1,22 +1,34 @@
 local inputKey = getgenv().Key
 
 if not inputKey or inputKey == "" then
-    game.Players.LocalPlayer:Kick("กรุณาใส่ Key ก่อนรันสคริปต์!")
+    game.Players.LocalPlayer:Kick("❌ กรุณาใส่ Key ก่อนรันสคริปต์!")
     return
 end
 
--- ต้องแทนที่ด้วย identifier/HWID ที่ environment ของคุณรองรับ
-local hwid = get_hwid_somehow()
+-- 1. ฟังก์ชันดึง HWID (รองรับ Executor ทั่วไป)
+local hwid = ""
+pcall(function()
+    hwid = gethwid()
+end)
+if hwid == "" then hwid = "UNKNOWN_HWID" end
 
+-- 2. ตั้งค่า Request ให้รองรับทุกค่าย (Synapse, Krnl, Delta, Codex ฯลฯ)
+local http_request = (syn and syn.request) or (http and http.request) or http_request or request or fluxus.request
+
+if not http_request then
+    game.Players.LocalPlayer:Kick("❌ ตัวรันของคุณไม่รองรับคำสั่ง http_request")
+    return
+end
+
+local HttpService = game:GetService("HttpService")
 local payload = {
     key = inputKey,
     hwid = hwid
 }
+local body = HttpService:JSONEncode(payload)
 
-local body = game:GetService("HttpService"):JSONEncode(payload)
-
-local response = request({
-    Url = "https://YOUR-DOMAIN.com/api/verify.php",
+local response = http_request({
+    Url = "https://YOUR-DOMAIN.com/api/verify.php", -- เปลี่ยนเป็น URL ของคุณ
     Method = "POST",
     Headers = {
         ["Content-Type"] = "application/json"
@@ -24,36 +36,43 @@ local response = request({
     Body = body
 })
 
-if not response then
-    game.Players.LocalPlayer:Kick("ไม่สามารถเชื่อมต่อ Whitelist Server ได้")
+if not response or response.StatusCode ~= 200 then
+    game.Players.LocalPlayer:Kick("❌ ไม่สามารถเชื่อมต่อ Whitelist Server ได้ หรือเซิร์ฟเวอร์มีปัญหา")
     return
 end
 
-local data = game:GetService("HttpService"):JSONDecode(response.Body)
+-- 3. ป้องกันบัคตอนแปลง JSON
+local successDecode, data = pcall(function()
+    return HttpService:JSONDecode(response.Body)
+end)
+
+if not successDecode or type(data) ~= "table" then
+    game.Players.LocalPlayer:Kick("❌ เซิร์ฟเวอร์ตอบกลับข้อมูลผิดพลาด (API Error)")
+    return
+end
 
 if not data.success then
-    game.Players.LocalPlayer:Kick(data.message or "Key ไม่ถูกต้อง")
+    game.Players.LocalPlayer:Kick("❌ " .. (data.message or "Key ไม่ถูกต้อง"))
     return
 end
 
-print("Whitelist OK")
-print("หมดอายุ:", data.expires_at)
+print("✅ Whitelist OK")
+print("⏳ หมดอายุ:", data.expires_at or "ถาวร")
 
 -- ==========================================
--- ผ่าน Whitelist แล้วค่อยโหลด UI
+-- โหลด UI (เมื่อผ่าน Whitelist แล้ว)
 -- ==========================================
 
 local successUI, MacUI = pcall(function()
-    return loadstring(game:HttpGet(
-        "https://raw.githubusercontent.com/chalamkub/Nyx/refs/heads/main/MacUI_Library_v2.lua"
-    ))()
+    return loadstring(game:HttpGet("https://raw.githubusercontent.com/chalamkub/Nyx/refs/heads/main/MacUI_Library_v2.lua"))()
 end)
 
 if not successUI or not MacUI then
-    warn("โหลด UI ไม่สำเร็จ")
+    warn("❌ โหลด UI ไม่สำเร็จ! ลิ้งค์อาจจะมีปัญหาหรือเข้าถึงไม่ได้")
     return
 end
 
+-- สร้างหน้าต่าง UI
 local Window = MacUI:MakeWindow({
     Name = "My Premium Script",
     HidePremium = false,
