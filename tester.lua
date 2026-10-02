@@ -1,5 +1,5 @@
 --==================================================
--- NYX WHITELIST (รองรับคีย์ถาวร + นับถอยหลังจาก expires_in)
+-- NYX WHITELIST (รองรับคีย์ถาวร + แสดงเวลาในโปรไฟล์ MacUI)
 --==================================================
 
 local Players = game:GetService("Players")
@@ -135,42 +135,49 @@ pcall(function()
     })
 end)
 
-task.wait(0.5)
 
---================ FIND PROFILE UI ================
-local function FindProfileContainer()
-    local PlayerGui = LocalPlayer:WaitForChild("PlayerGui")
-    local Names = {
-        "Profile", "profile", "User", "user", "UserProfile", "UserInfo",
-        "Player", "PlayerProfile", "ProfileFrame", "UserFrame",
-        "Account", "AccountFrame"
-    }
+--==================================================
+-- การนำเวลาไปแทรกในหน้าโปรไฟล์ MacUI
+--==================================================
 
-    for _, gui in ipairs(PlayerGui:GetDescendants()) do
-        if gui:IsA("Frame") or gui:IsA("ScrollingFrame") or gui:IsA("CanvasGroup") then
-            for _, name in ipairs(Names) do
-                if gui.Name == name then
-                    return gui
+-- รอเวลาสักครู่ให้ MacUI ทำการสร้างหน้าต่าง UI จนเสร็จสมบูรณ์
+task.wait(1.5) 
+
+-- ฟังก์ชันสำหรับค้นหาป้ายชื่อ (TextLabel) ของผู้เล่นใน MacUI
+local function FindMacUIProfileNameLabel()
+    local targetParent = (typeof(gethui) == "function" and gethui()) or game:GetService("CoreGui")
+    local pName = LocalPlayer.Name
+    local pDisp = LocalPlayer.DisplayName
+
+    for _, gui in ipairs(targetParent:GetDescendants()) do
+        if gui:IsA("TextLabel") and (gui.Text == pName or gui.Text == pDisp) then
+            -- เช็กให้ชัวร์ว่าเป็นโซนโปรไฟล์ โดยดูว่ามีรูปภาพอวาตาร์ (ImageLabel) อยู่ข้างๆ ไหม
+            if gui.Parent then
+                for _, sibling in ipairs(gui.Parent:GetChildren()) do
+                    if sibling:IsA("ImageLabel") or sibling:IsA("ImageButton") then
+                        return gui
+                    end
                 end
             end
         end
     end
-
-    for _, gui in ipairs(PlayerGui:GetDescendants()) do
-        if gui:IsA("TextLabel") or gui:IsA("TextButton") then
-            local text = string.lower(tostring(gui.Text or ""))
-            if (text:find("profile") or text:find("user")) and gui.Parent then
-                return gui.Parent
-            end
-        end
-    end
-
     return nil
 end
 
-local ProfileContainer = FindProfileContainer()
+local ProfileNameLabel = FindMacUIProfileNameLabel()
+local OriginalNameText = LocalPlayer.DisplayName
 
-if not ProfileContainer then
+if ProfileNameLabel then
+    OriginalNameText = ProfileNameLabel.Text
+    ProfileNameLabel.RichText = true -- เปิดใช้งานแท็กจัดรูปแบบข้อความ
+    ProfileNameLabel.TextScaled = false
+    ProfileNameLabel.TextSize = 14
+end
+
+
+--================ FALLBACK UI (กรณีหาหน้าโปรไฟล์ MacUI ไม่เจอ) ================
+local CountdownLabel
+if not ProfileNameLabel then
     local ScreenGui = Instance.new("ScreenGui")
     ScreenGui.Name = "NyxCountdownGui"
 
@@ -180,31 +187,32 @@ if not ProfileContainer then
 
     pcall(function() ScreenGui.Parent = targetParent end)
 
-    ProfileContainer = Instance.new("Frame")
+    local ProfileContainer = Instance.new("Frame")
     ProfileContainer.Name = "NyxProfileCountdown"
     ProfileContainer.Parent = ScreenGui
     ProfileContainer.AnchorPoint = Vector2.new(0, 1)
     ProfileContainer.Position = UDim2.new(0, 15, 1, -15)
     ProfileContainer.Size = UDim2.new(0, 300, 0, 45)
     ProfileContainer.BackgroundTransparency = 1
+    
+    CountdownLabel = Instance.new("TextLabel")
+    CountdownLabel.Name = "NyxCountdown"
+    CountdownLabel.Parent = ProfileContainer
+    CountdownLabel.BackgroundTransparency = 1
+    CountdownLabel.BorderSizePixel = 0
+    CountdownLabel.Size = UDim2.new(1, -10, 0, 30)
+    CountdownLabel.Position = UDim2.new(0, 5, 1, -30)
+    CountdownLabel.TextXAlignment = Enum.TextXAlignment.Left
+    CountdownLabel.TextYAlignment = Enum.TextYAlignment.Center
+    CountdownLabel.Font = Enum.Font.GothamMedium
+    CountdownLabel.TextSize = 13
+    CountdownLabel.TextColor3 = Color3.fromRGB(255, 255, 255)
+    CountdownLabel.TextStrokeTransparency = 0.6
+    CountdownLabel.Text = "กำลังโหลด..."
 end
 
---================ COUNTDOWN LABEL ================
-local CountdownLabel = Instance.new("TextLabel")
-CountdownLabel.Name = "NyxCountdown"
-CountdownLabel.Parent = ProfileContainer
-CountdownLabel.BackgroundTransparency = 1
-CountdownLabel.BorderSizePixel = 0
-CountdownLabel.Size = UDim2.new(1, -10, 0, 30)
-CountdownLabel.Position = UDim2.new(0, 5, 1, -30)
-CountdownLabel.TextXAlignment = Enum.TextXAlignment.Left
-CountdownLabel.TextYAlignment = Enum.TextYAlignment.Center
-CountdownLabel.Font = Enum.Font.GothamMedium
-CountdownLabel.TextSize = 13
-CountdownLabel.TextColor3 = Color3.fromRGB(255, 255, 255)
-CountdownLabel.TextStrokeTransparency = 0.6
-CountdownLabel.Text = "เหลือเวลา: กำลังโหลด..."
 
+--================ FORMAT TIME ================
 local function FormatTime(seconds)
     seconds = math.max(0, math.floor(seconds))
     local days = math.floor(seconds / 86400)
@@ -213,22 +221,40 @@ local function FormatTime(seconds)
     seconds = seconds % 3600
     local minutes = math.floor(seconds / 60)
     local secs = seconds % 60
-    return string.format("%d วัน %d ชั่วโมง %d นาที %d วินาที", days, hours, minutes, secs)
+    
+    -- ทำคำให้สั้นลงเพื่อไม่ให้ล้นกรอบโปรไฟล์ของ MacUI
+    if days > 0 then
+        return string.format("%d วัน %d ชม. %d นาที", days, hours, minutes)
+    else
+        return string.format("%d ชม. %d นาที %d วินาที", hours, minutes, secs)
+    end
 end
 
+
+--================ COUNTDOWN LOGIC ================
 task.spawn(function()
     if IsLifetime then
-        CountdownLabel.Text = "เหลือเวลา: ถาวร"
+        if ProfileNameLabel then
+            -- แทรกบรรทัดใหม่ (\n) เพื่อให้เวลาไปอยู่ใต้ชื่อ พร้อมปรับสีและขนาดอักษรให้ดูสวยงาม
+            ProfileNameLabel.Text = OriginalNameText .. "\n<font color='rgb(170,170,170)' size='11'>สถานะ: ถาวร</font>"
+        else
+            CountdownLabel.Text = "เหลือเวลา: ถาวร"
+        end
         return
     end
 
     while true do
         local remaining = ExpireTimestamp - os.time()
-        if remaining <= 0 then
-            CountdownLabel.Text = "เหลือเวลา: หมดอายุแล้ว"
-            break
+        local isExpired = remaining <= 0
+        local timeStr = isExpired and "หมดอายุแล้ว" or FormatTime(remaining)
+        
+        if ProfileNameLabel then
+            ProfileNameLabel.Text = OriginalNameText .. "\n<font color='rgb(170,170,170)' size='11'>⏳ " .. timeStr .. "</font>"
+        else
+            CountdownLabel.Text = "เหลือเวลา: " .. timeStr
         end
-        CountdownLabel.Text = "เหลือเวลา: " .. FormatTime(remaining)
+
+        if isExpired then break end
         task.wait(1)
     end
 end)
