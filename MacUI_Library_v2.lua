@@ -23,6 +23,22 @@
 --   Window:AddSettingsTab()   -- optional ready-made theme / glass / size settings
 --   Window:Toggle()  Window:Destroy()  Window:SetTheme(n)  Window:SetAccent(c)  Window:SetScale(n)  Window:SetGlass(n)
 --
+-- Other naming styles work too:
+--   Library:Window({ Title, Subtitle, Size = UDim2.fromOffset(500, 350), Theme })   (colon or dot, same as CreateWindow)
+--   Window:Tab / CreateTab / MakeTab({ Name, Icon })      Tab:Section / CreateSection({ Title, Desc })
+--   Controls can be called on a Section OR directly on a Tab (untitled section is created automatically):
+--     Button / CreateButton, Toggle, Slider, Dropdown, Label / Paragraph, Textbox / Input, Bind / Keybind
+--   Option aliases: Name/Title/Text, Desc/Description, Callback/Function/Action, CurrentValue, Values/List/Items, Content, ...
+--   Textbox: { Name, Default, Placeholder, Numeric, EnterOnly, Callback(text) }   obj:Set / obj:Get
+--   Bind:    { Name, Default = Enum.KeyCode.F, Callback(key), OnChange(key), Released(key) }   obj:Set / obj:Get
+--   Dropdown object: :Set  :Get  :Refresh(newList)
+--   Library:Notify({ Title, Content, Duration = 3, Type = "success" | "warning" | "error" })   (also Window:Notify)
+--   Library:Destroy() removes every window; Window:Destroy() removes one.
+--   Toggle-UI keybind: CreateWindow({ ToggleKey = Enum.KeyCode.RightShift })  (default RightShift, false = none)
+--     Window:SetToggleKey(Enum.KeyCode.F1 | "F1" | false)  Window:GetToggleKey()
+--     Window:Show() Hide() Toggle() SetVisible(bool) IsVisible()
+--     The Settings tab has a "Toggle UI" row: click it, press a key (Backspace = none, Esc = cancel).
+--
 -- Window buttons: red = close script (asks to confirm), yellow = 2 sizes, green = hide.
 -- Built-in drawn icons: sprout, bag, arrow, shield, dumbbell, pin, gear, user, home, sword, search, list,
 --   sidebar, left, right, updown, lock, star, bolt, eye, folder
@@ -42,23 +58,6 @@ local TweenService = game:GetService("TweenService")
 local AssetService = game:GetService("AssetService")
 
 local MacUI = {}
-
--- Compatibility helpers: accept common naming styles without changing the UI.
--- Priority is always Name -> Title -> Text -> ButtonText -> fallback.
-local function optionName(options, fallback)
-	if type(options) == "string" then
-		return options
-	end
-	options = options or {}
-	return options.Name or options.Title or options.Text or options.ButtonText or fallback
-end
-
-local function normalizeOptions(options, fallback)
-	if type(options) ~= "table" then
-		return { Name = tostring(options or fallback) }
-	end
-	return options
-end
 
 local Presets = {
 	Dark = {
@@ -544,10 +543,298 @@ local function tintIcon(ic, color)
 end
 
 ----------------------------------------------------------------------
-function MacUI.CreateWindow(opts)
-	opts = opts or {}
+-- ============================================================================
+-- COMPATIBILITY LAYER: other naming styles, notifications, library-level destroy
+-- ============================================================================
+local function firstNonNil(...)
+	for i = 1, select("#", ...) do
+		local v = select(i, ...)
+		if v ~= nil then
+			return v
+		end
+	end
+	return nil
+end
+
+local function copyTable(t)
+	local c = {}
+	for k, v in pairs(t) do
+		c[k] = v
+	end
+	return c
+end
+
+-- Enum.KeyCode.F  /  "F"  /  "RightShift"  ->  Enum.KeyCode item (nil when it is not a key)
+local ENUM_ITEM = "EnumItem"
+local function toKeyCode(k)
+	if typeof(k) == ENUM_ITEM and k.EnumType == Enum.KeyCode then
+		return k
+	end
+	if type(k) == "string" then
+		local ok, v = pcall(function()
+			return Enum.KeyCode[k]
+		end)
+		if ok and v then
+			return v
+		end
+	end
+	return nil
+end
+
+-- every control type and the alternative method names that map to it
+local KIND_NAMES = {
+	Button = { "Button", "CreateButton", "NewButton" },
+	Toggle = { "Toggle", "CreateToggle", "NewToggle" },
+	Slider = { "Slider", "CreateSlider", "NewSlider" },
+	Dropdown = { "Dropdown", "CreateDropdown", "NewDropdown" },
+	Label = { "Label", "CreateLabel", "NewLabel", "Paragraph", "AddParagraph", "CreateParagraph" },
+	Textbox = {
+		"Textbox", "TextBox", "CreateTextbox", "CreateTextBox", "AddTextBox", "NewTextbox",
+		"Input", "AddInput", "CreateInput",
+	},
+	Bind = {
+		"Bind", "Keybind", "KeyBind", "CreateBind", "CreateKeybind", "AddKeybind", "AddKeyBind", "NewBind",
+	},
+}
+
+-- accepts the option names other UI libraries use (Title/Text, CurrentValue, Values, Content, ...)
+local function normControl(kind, o)
+	if type(o) == "string" then
+		o = { Name = o }
+	end
+	local n = copyTable(o or {})
+	n.Name = firstNonNil(n.Name, n.Title, n.Text, n.Label)
+	n.Desc = firstNonNil(n.Desc, n.Description, n.Info)
+	n.Callback = firstNonNil(n.Callback, n.Function, n.Action, n.Func)
+	if kind == "Toggle" then
+		n.Default = firstNonNil(n.Default, n.CurrentValue, n.Value, n.State, n.Enabled, false)
+	elseif kind == "Slider" then
+		if type(n.Range) == "table" then
+			n.Min = firstNonNil(n.Min, n.Range[1], n.Range.Min)
+			n.Max = firstNonNil(n.Max, n.Range[2], n.Range.Max)
+		end
+		n.Min = firstNonNil(n.Min, n.Minimum)
+		n.Max = firstNonNil(n.Max, n.Maximum)
+		n.Default = firstNonNil(n.Default, n.CurrentValue, n.Value, n.Min)
+		n.Increment = firstNonNil(n.Increment, n.Step)
+		n.Suffix = firstNonNil(n.Suffix, n.ValueName)
+	elseif kind == "Dropdown" then
+		n.Options = firstNonNil(n.Options, n.Values, n.List, n.Items, n.Choices)
+		n.Default = firstNonNil(n.Default, n.CurrentOption, n.Value)
+		if type(n.Default) == "table" then
+			n.Default = n.Default[1]
+		end
+	elseif kind == "Label" then
+		n.Value = firstNonNil(n.Value, n.Content, n.Description)
+		if n.Value == nil and n.Name ~= nil then
+			n.Value = n.Name -- Section:Label("just text")
+			n.Name = ""
+		end
+	elseif kind == "Textbox" then
+		n.Default = firstNonNil(n.Default, n.CurrentValue, n.Value, "")
+		n.Placeholder = firstNonNil(n.Placeholder, n.PlaceholderText)
+	elseif kind == "Bind" then
+		n.Default = firstNonNil(n.Default, n.CurrentKeybind, n.CurrentBind, n.Key, n.Keybind, n.Value)
+		n.OnChange = firstNonNil(n.OnChange, n.Changed, n.ChangedCallback)
+	end
+	return n
+end
+
+MacUI._windows = {} -- every live window, so MacUI.Destroy() can remove them all
+
+-- notifications (bottom-right corner, stack upwards)
+local notifyGui, notifyHolder
+local notifyCounter = 0
+local NotifyDefault = {
+	Card = Color3.fromRGB(41, 45, 54), Stroke = Color3.fromRGB(60, 66, 78),
+	Text = Color3.fromRGB(236, 239, 246), SubText = Color3.fromRGB(150, 157, 171),
+	Accent = Color3.fromRGB(41, 148, 255),
+}
+local NotifyTypes = {
+	success = Color3.fromRGB(52, 199, 100),
+	warning = Color3.fromRGB(255, 177, 66), warn = Color3.fromRGB(255, 177, 66),
+	error = Color3.fromRGB(255, 82, 82), danger = Color3.fromRGB(255, 82, 82),
+}
+
+local function ensureNotifyGui()
+	if notifyGui and notifyGui.Parent then
+		return
+	end
+	notifyGui = New("ScreenGui", {
+		Name = "MacUI_Notify",
+		ResetOnSpawn = false,
+		IgnoreGuiInset = true,
+		DisplayOrder = 1000,
+		ZIndexBehavior = Enum.ZIndexBehavior.Sibling,
+	})
+	local ok = pcall(function()
+		notifyGui.Parent = (gethui and gethui()) or game:GetService("CoreGui")
+	end)
+	if not ok or not notifyGui.Parent then
+		notifyGui.Parent = Players.LocalPlayer:WaitForChild("PlayerGui")
+	end
+	notifyHolder = New("Frame", {
+		BackgroundTransparency = 1,
+		AnchorPoint = Vector2.new(1, 1),
+		Position = UDim2.new(1, -16, 1, -16),
+		Size = UDim2.new(0, 290, 1, -32),
+		Parent = notifyGui,
+	}, {
+		New("UIListLayout", {
+			Padding = UDim.new(0, 8),
+			SortOrder = Enum.SortOrder.LayoutOrder,
+			VerticalAlignment = Enum.VerticalAlignment.Bottom,
+		}),
+	})
+end
+
+-- MacUI.Notify({ Title = "..", Content = "..", Duration = 3, Type = "success" | "warning" | "error" })
+-- also works as Library:Notify(...) and Window:Notify(...); a plain string is the content
+function MacUI.Notify(a, b)
+	local o = a
+	if a == MacUI then
+		o = b
+	end
+	if type(o) == "string" then
+		o = { Content = o }
+	end
+	o = o or {}
+	local title = tostring(firstNonNil(o.Title, o.Name, "Notification"))
+	local content = tostring(firstNonNil(o.Content, o.Text, o.Description, o.Desc, ""))
+	local duration = tonumber(firstNonNil(o.Duration, o.Time, 3)) or 3
+	local C = MacUI._theme or NotifyDefault
+	local accent = NotifyTypes[string.lower(tostring(o.Type or ""))] or C.Accent
+
+	ensureNotifyGui()
+	notifyCounter += 1
+	local wrap = New("Frame", {
+		BackgroundTransparency = 1,
+		AutomaticSize = Enum.AutomaticSize.Y,
+		Size = UDim2.new(1, 0, 0, 0),
+		LayoutOrder = notifyCounter,
+		Parent = notifyHolder,
+	})
+	local card = New("Frame", {
+		BackgroundColor3 = C.Card,
+		BorderSizePixel = 0,
+		ClipsDescendants = true,
+		AutomaticSize = Enum.AutomaticSize.Y,
+		Size = UDim2.new(1, 0, 0, 0),
+		Position = UDim2.new(0, 320, 0, 0),
+		Parent = wrap,
+	}, {
+		Round(10),
+		New("UIStroke", { Color = C.Stroke, Thickness = 1, ApplyStrokeMode = Enum.ApplyStrokeMode.Border }),
+	})
+	New("Frame", {
+		BackgroundColor3 = accent,
+		BorderSizePixel = 0,
+		Size = UDim2.new(0, 3, 1, 0),
+		Parent = card,
+	})
+	local inner = New("Frame", {
+		BackgroundTransparency = 1,
+		AutomaticSize = Enum.AutomaticSize.Y,
+		Size = UDim2.new(1, 0, 0, 0),
+		Parent = card,
+	}, {
+		New("UIListLayout", { Padding = UDim.new(0, 3), SortOrder = Enum.SortOrder.LayoutOrder }),
+		New("UIPadding", {
+			PaddingLeft = UDim.new(0, 16), PaddingRight = UDim.new(0, 12),
+			PaddingTop = UDim.new(0, 10), PaddingBottom = UDim.new(0, 10),
+		}),
+	})
+	New("TextLabel", {
+		BackgroundTransparency = 1,
+		Text = title,
+		Font = Enum.Font.GothamBold,
+		TextSize = 14,
+		TextColor3 = C.Text,
+		TextXAlignment = Enum.TextXAlignment.Left,
+		TextWrapped = true,
+		AutomaticSize = Enum.AutomaticSize.Y,
+		Size = UDim2.new(1, 0, 0, 0),
+		LayoutOrder = 1,
+		Parent = inner,
+	})
+	if content ~= "" then
+		New("TextLabel", {
+			BackgroundTransparency = 1,
+			Text = content,
+			Font = Enum.Font.Gotham,
+			TextSize = 12,
+			TextColor3 = C.SubText,
+			TextXAlignment = Enum.TextXAlignment.Left,
+			TextWrapped = true,
+			AutomaticSize = Enum.AutomaticSize.Y,
+			Size = UDim2.new(1, 0, 0, 0),
+			LayoutOrder = 2,
+			Parent = inner,
+		})
+	end
+	local hit = New("TextButton", {
+		Text = "",
+		BackgroundTransparency = 1,
+		Size = UDim2.fromScale(1, 1),
+		ZIndex = 5,
+		Parent = card,
+	})
+
+	TweenService:Create(card, TweenInfo.new(0.3, Enum.EasingStyle.Quint, Enum.EasingDirection.Out), {
+		Position = UDim2.new(0, 0, 0, 0),
+	}):Play()
+
+	local closed = false
+	local function close()
+		if closed then
+			return
+		end
+		closed = true
+		local tw = TweenService:Create(card, TweenInfo.new(0.25, Enum.EasingStyle.Quint, Enum.EasingDirection.In), {
+			Position = UDim2.new(0, 320, 0, 0),
+		})
+		tw:Play()
+		task.delay(0.3, function()
+			wrap:Destroy()
+		end)
+	end
+	hit.Activated:Connect(close)
+	if duration > 0 and duration < math.huge then
+		task.delay(duration, close)
+	end
+	return { Close = close }
+end
+
+-- removes every window (and notifications) created by this library
+function MacUI.Destroy()
+	for _, w in ipairs(table.clone(MacUI._windows)) do
+		pcall(function()
+			w:Destroy()
+		end)
+	end
+	if notifyGui then
+		notifyGui:Destroy()
+		notifyGui = nil
+	end
+end
+
+local function buildWindow(opts)
+	if type(opts) == "string" then
+		opts = { Title = opts }
+	end
+	do -- accept other option names without touching the caller's table
+		local c = copyTable(opts or {})
+		c.Title = firstNonNil(c.Title, c.Name, c.Text)
+		c.Subtitle = firstNonNil(c.Subtitle, c.SubTitle, c.Description)
+		opts = c
+	end
 	registerIcons(opts.Icons)
 	local WIDTH, HEIGHT, SIDE = 560, 370, 150
+	local UDIM2 = "UDim2"
+	if typeof(opts.Size) == UDIM2 and opts.Size.X.Offset > 0 and opts.Size.Y.Offset > 0 then
+		WIDTH = math.max(430, opts.Size.X.Offset)
+		HEIGHT = math.max(300, opts.Size.Y.Offset)
+	end
 	local PROFILE_H = (opts.ShowUser ~= false) and 54 or 0
 	local conns = {}
 
@@ -1100,6 +1387,22 @@ function MacUI.CreateWindow(opts)
 		end)
 	end
 
+	-- toggle-UI keybind state
+	local NONE_KEY = Enum.KeyCode.Unknown
+	local toggleKey = NONE_KEY
+	do
+		local k = opts.ToggleKey
+		if k == false or k == "None" then
+			toggleKey = NONE_KEY -- keyboard toggle disabled (the floating button still works)
+		else
+			toggleKey = toKeyCode(k) or Enum.KeyCode.RightShift
+		end
+	end
+	local bindBusy = false -- true while any Bind control is waiting for a key press
+	local consumedInput -- the key press a Bind control just captured (never also toggles the UI)
+	local activeBindCancel -- cancels the Bind control that is currently listening
+	local toggleBindCtl -- the "Toggle UI" row in the settings tab (kept in sync)
+
 	local refreshCurrent -- assigned after selectTab exists
 	local function toggleMain()
 		main.Visible = not main.Visible
@@ -1270,7 +1573,7 @@ function MacUI.CreateWindow(opts)
 				end
 			end
 			tab.HasMatch = any
-			tab.Button.Visible = (q == "") or any
+			tab.Btn.Visible = (q == "") or any
 			if any and not firstMatch then
 				firstMatch = tab
 			end
@@ -1280,7 +1583,7 @@ function MacUI.CreateWindow(opts)
 		for _, g in ipairs(groupList) do
 			local shown = false
 			for _, t in ipairs(g.Tabs) do
-				if t.Button.Visible then
+				if t.Btn.Visible then
 					shown = true
 				end
 			end
@@ -1312,7 +1615,7 @@ function MacUI.CreateWindow(opts)
 
 	local function styleTab(tab)
 		local selected = (currentTab == tab)
-		tab.Button.BackgroundColor3 = Theme.Selected
+		tab.Btn.BackgroundColor3 = Theme.Selected
 		local c = selected and Theme.SelectedText or Theme.SubText
 		tab.Text.TextColor3 = c
 		tab.Bar.Visible = selected
@@ -1330,11 +1633,11 @@ function MacUI.CreateWindow(opts)
 		currentTab = tab
 		if old and old ~= tab then
 			old.Page.Visible = false
-			tween(old.Button, { BackgroundTransparency = 1 })
+			tween(old.Btn, { BackgroundTransparency = 1 })
 			styleTab(old)
 		end
 		tab.Page.Visible = true
-		tween(tab.Button, { BackgroundTransparency = 0 })
+		tween(tab.Btn, { BackgroundTransparency = 0 })
 		styleTab(tab)
 		if not skipFilter then
 			applyFilter()
@@ -1348,7 +1651,7 @@ function MacUI.CreateWindow(opts)
 	local function navList()
 		local list = {}
 		for _, t in ipairs(tabsList) do
-			if t.Button.Visible then
+			if t.Btn.Visible then
 				table.insert(list, t)
 			end
 		end
@@ -1400,8 +1703,7 @@ function MacUI.CreateWindow(opts)
 	end
 
 	local function makeSection(tab, o)
-		o = normalizeOptions(o, "Section")
-		local sectionTitle = optionName(o, nil)
+		o = o or {}
 		local Section = { _count = 0 }
 		tab._order += 1
 
@@ -1415,7 +1717,7 @@ function MacUI.CreateWindow(opts)
 		local secEntry = { Holder = holder, Rows = {} }
 		table.insert(tab._sections, secEntry)
 
-		if sectionTitle and o.Icon then
+		if o.Title and o.Icon then
 			local head = New("Frame", {
 				BackgroundTransparency = 1,
 				AutomaticSize = Enum.AutomaticSize.Y,
@@ -1432,7 +1734,7 @@ function MacUI.CreateWindow(opts)
 				themedIcon(sic, "Accent")
 			end
 			Label({
-				Text = sectionTitle,
+				Text = o.Title,
 				Font = Enum.Font.GothamBold,
 				AutomaticSize = Enum.AutomaticSize.Y,
 				Position = UDim2.fromOffset(24, 0),
@@ -1440,9 +1742,9 @@ function MacUI.CreateWindow(opts)
 				TextWrapped = true,
 				Parent = head,
 			}, "Text")
-		elseif sectionTitle then
+		elseif o.Title then
 			Label({
-				Text = sectionTitle,
+				Text = o.Title,
 				Font = Enum.Font.GothamBold,
 				AutomaticSize = Enum.AutomaticSize.Y,
 				Size = UDim2.new(1, 0, 0, 0),
@@ -1521,9 +1823,7 @@ function MacUI.CreateWindow(opts)
 		end
 
 		function Section:AddToggle(t)
-			t = normalizeOptions(t, "Toggle")
-			local title = optionName(t, "Toggle")
-			local row = newRow(title, t.Desc)
+			local row = newRow(t.Name, t.Desc)
 			local state = t.Default == true
 			local track = New("TextButton", {
 				Text = "",
@@ -1569,9 +1869,7 @@ function MacUI.CreateWindow(opts)
 		end
 
 		function Section:AddDropdown(d)
-			d = normalizeOptions(d, "Dropdown")
-			local title = optionName(d, "Dropdown")
-			local row = newRow(title, d.Desc)
+			local row = newRow(d.Name, d.Desc)
 			local options = d.Options or {}
 			local value = d.Default or options[1]
 
@@ -1682,13 +1980,19 @@ function MacUI.CreateWindow(opts)
 			function obj:Get()
 				return value
 			end
+			-- replace the option list (value is kept when it is still in the list)
+			function obj:Refresh(list, keepValue)
+				options = list or {}
+				if not keepValue and not table.find(options, value) then
+					set(options[1], true)
+				end
+			end
+			obj.SetOptions = obj.Refresh
 			return obj
 		end
 
 		function Section:AddSlider(s)
-			s = normalizeOptions(s, "Slider")
-			local title = optionName(s, "Slider")
-			local row = newRow(title, s.Desc)
+			local row = newRow(s.Name, s.Desc)
 			local min, max, inc = s.Min or 0, s.Max or 100, s.Increment or 1
 			local value = math.clamp(s.Default or min, min, max)
 
@@ -1762,11 +2066,9 @@ function MacUI.CreateWindow(opts)
 		end
 
 		function Section:AddButton(b)
-			b = normalizeOptions(b, "Button")
-			local title = optionName(b, "Button")
-			local row = newRow(title, b.Desc)
+			local row = newRow(b.Name, b.Desc)
 			local btn = themed(New("TextButton", {
-				Text = b.ButtonText or b.Name or b.Title or b.Text or "Run",
+				Text = b.ButtonText or "Run",
 				Font = Enum.Font.GothamMedium,
 				TextSize = 13,
 				AutoButtonColor = false,
@@ -1797,9 +2099,7 @@ function MacUI.CreateWindow(opts)
 		end
 
 		function Section:AddLabel(l)
-			l = normalizeOptions(l, "Label")
-			local title = optionName(l, "Label")
-			local row, descLabel = newRow(title, l.Value or l.Content or " ")
+			local row, descLabel = newRow(l.Name, l.Value or " ")
 			row.AutomaticSize = Enum.AutomaticSize.Y
 			descLabel.TextTruncate = Enum.TextTruncate.None
 			descLabel.TextWrapped = true
@@ -1807,211 +2107,208 @@ function MacUI.CreateWindow(opts)
 			descLabel.AutomaticSize = Enum.AutomaticSize.Y
 			descLabel.Size = UDim2.new(1, -28, 0, 16)
 			New("UIPadding", { PaddingBottom = UDim.new(0, 10), Parent = descLabel })
+			if l.Name == nil or l.Name == "" then
+				row.Size = UDim2.new(1, 0, 0, 40)
+				descLabel.Position = UDim2.new(0, 14, 0, 10)
+			end
 			local obj = {}
 			function obj:Set(text)
-				descLabel.Text = text
+				descLabel.Text = tostring(text)
 			end
 			return obj
 		end
 
-
-
-		-- ==============================================================
-		-- Extended controls: Textbox / Bind
-		-- These are additive; existing controls and their visual layout
-		-- are intentionally left unchanged.
-		-- ==============================================================
-		function Section:AddTextbox(options)
-			if type(options) ~= "table" then
-				options = { Name = tostring(options or "Textbox") }
-			end
-
-			local title = optionName(options, "Textbox")
-			local desc = options.Desc or options.Description
-			local defaultText = options.Default
-			if defaultText == nil then
-				defaultText = options.Value
-			end
-			defaultText = tostring(defaultText or "")
-			local callback = options.Callback or options.OnChanged or options.Function or function() end
-			local fireOnChange = options.Live == true or options.CallbackOnChange == true
-
-			local row = newRow(title, desc)
+		function Section:AddTextbox(t)
+			local row = newRow(t.Name, t.Desc)
 			local box = themed(New("TextBox", {
-				Text = defaultText,
-				PlaceholderText = tostring(options.Placeholder or options.PlaceholderText or ""),
-				Font = Enum.Font.Gotham,
-				TextSize = 13,
-				ClearTextOnFocus = options.ClearOnFocus == true,
-				TextXAlignment = Enum.TextXAlignment.Left,
 				AnchorPoint = Vector2.new(1, 0.5),
 				Position = UDim2.new(1, -14, 0.5, 0),
-				Size = UDim2.fromOffset(options.Width or 170, 28),
+				Size = UDim2.fromOffset(math.clamp(tonumber(t.Width) or 150, 60, 170), 26),
+				Text = tostring(t.Default or ""),
+				PlaceholderText = tostring(t.Placeholder or ""),
+				Font = Enum.Font.Gotham,
+				TextSize = 13,
+				TextXAlignment = Enum.TextXAlignment.Left,
+				ClearTextOnFocus = t.ClearOnFocus == true,
+				ClipsDescendants = true,
 				BorderSizePixel = 0,
 				Parent = row,
 			}, {
 				Round(6),
 				Stroke("Stroke"),
-				New("UIPadding", {
-					PaddingLeft = UDim.new(0, 9),
-					PaddingRight = UDim.new(0, 9),
-				}),
+				New("UIPadding", { PaddingLeft = UDim.new(0, 10), PaddingRight = UDim.new(0, 10) }),
 			}), {
-				BackgroundColor3 = "Field",
-				BackgroundTransparency = "GlassField",
-				TextColor3 = "Text",
+				BackgroundColor3 = "Field", BackgroundTransparency = "GlassField",
+				TextColor3 = "Text", PlaceholderColor3 = "SubText",
 			})
-
-			local obj = { Instance = box }
-
-			local function fire()
-				task.spawn(callback, box.Text)
-			end
-
-			if fireOnChange then
+			local stroke = box:FindFirstChildOfClass("UIStroke")
+			box.Focused:Connect(function()
+				if stroke then
+					stroke.Color = Theme.Accent
+				end
+			end)
+			if t.Numeric then
 				box:GetPropertyChangedSignal("Text"):Connect(function()
-					fire()
-				end)
-			else
-				box.FocusLost:Connect(function(enterPressed)
-					if enterPressed or options.FireOnFocusLost == true then
-						fire()
+					local f = string.gsub(box.Text, "[^%d%.%-]", "")
+					if f ~= box.Text then
+						box.Text = f
 					end
 				end)
 			end
-
-			function obj:Set(v, fireCallback)
-				box.Text = tostring(v == nil and "" or v)
-				if fireCallback then
-					fire()
+			-- fires when the user presses Enter or clicks away (EnterOnly = true -> only on Enter)
+			box.FocusLost:Connect(function(enterPressed)
+				if stroke then
+					stroke.Color = Theme.Stroke
 				end
+				if t.EnterOnly and not enterPressed then
+					return
+				end
+				if t.Callback then
+					task.spawn(t.Callback, box.Text)
+				end
+			end)
+			local obj = { Instance = box }
+			function obj:Set(v)
+				box.Text = tostring(v)
 			end
 			function obj:Get()
 				return box.Text
 			end
-			function obj:Focus()
-				box:CaptureFocus()
-			end
-			function obj:Clear()
-				box.Text = ""
-			end
-
 			return obj
 		end
 
-		Section.AddTextBox = Section.AddTextbox
-		Section.CreateTextbox = Section.AddTextbox
-		Section.CreateTextBox = Section.AddTextbox
-		Section.Textbox = Section.AddTextbox
-		Section.TextBox = Section.AddTextbox
-		Section.Input = Section.AddTextbox
-
-		function Section:AddBind(options)
-			if type(options) ~= "table" then
-				options = { Name = tostring(options or "Keybind") }
+		function Section:AddBind(b)
+			local row = newRow(b.Name, b.Desc)
+			local NONE = Enum.KeyCode.Unknown
+			local toKey = toKeyCode
+			local key
+			if b.Default == false or b.Default == "None" then
+				key = NONE
+			else
+				key = toKey(b.Default) or Enum.KeyCode.RightControl
 			end
+			local listening = false
 
-			local title = optionName(options, "Keybind")
-			local desc = options.Desc or options.Description
-			local key = options.Default or options.Key or options.KeyCode or Enum.KeyCode.RightControl
-			local callback = options.Callback or options.OnPress or options.Function or function() end
-
-			local row = newRow(title, desc)
-			local button = themed(New("TextButton", {
-				Text = tostring(key):gsub("Enum.KeyCode.", ""),
+			local btn = themed(New("TextButton", {
+				Text = "",
 				Font = Enum.Font.GothamMedium,
 				TextSize = 13,
 				AutoButtonColor = false,
 				AnchorPoint = Vector2.new(1, 0.5),
 				Position = UDim2.new(1, -14, 0.5, 0),
-				Size = UDim2.fromOffset(110, 26),
+				Size = UDim2.fromOffset(96, 26),
 				BorderSizePixel = 0,
 				Parent = row,
 			}, { Round(6), Stroke("Stroke") }), {
-				BackgroundColor3 = "Field",
-				BackgroundTransparency = "GlassField",
-				TextColor3 = "Text",
+				BackgroundColor3 = "Field", BackgroundTransparency = "GlassField", TextColor3 = "Text",
 			})
-
-			local listening = false
-			local obj = { Instance = button }
-
-			local function keyText(v)
-				return tostring(v):gsub("Enum.KeyCode.", ""):gsub("Enum.UserInputType.", "")
+			local function paint()
+				btn.Text = listening and "..." or (key == NONE and "None" or key.Name)
+				btn.TextColor3 = listening and Theme.Accent or Theme.Text
 			end
-			local function setKey(v, silent)
-				if v == nil then
-					return
-				end
-				key = v
-				button.Text = keyText(v)
-				if not silent and options.OnChanged then
-					task.spawn(options.OnChanged, v)
+			paint()
+			local cancelListen
+			local function stopListening()
+				listening = false
+				paint()
+				if activeBindCancel == cancelListen then
+					activeBindCancel = nil
+					task.defer(function() -- after this input event, so the key just captured never toggles the UI
+						if not activeBindCancel then
+							bindBusy = false
+						end
+					end)
 				end
 			end
-
-			button.Activated:Connect(function()
-				listening = true
-				button.Text = "Press key..."
-			end)
-
-			local bindConn
-			bindConn = UIS.InputBegan:Connect(function(input, processed)
+			cancelListen = stopListening
+			btn.Activated:Connect(function()
 				if listening then
-					if input.UserInputType == Enum.UserInputType.Keyboard then
-						setKey(input.KeyCode)
-						listening = false
+					stopListening()
+				else
+					if activeBindCancel then
+						activeBindCancel()
 					end
-					return
-				end
-				if not processed and input.UserInputType == Enum.UserInputType.Keyboard and input.KeyCode == key then
-					task.spawn(callback, key)
+					listening = true
+					activeBindCancel = cancelListen
+					bindBusy = true
+					paint()
 				end
 			end)
-			table.insert(conns, bindConn)
 
-			function obj:Set(v)
-				setKey(v, true)
+			-- click the box, then press a key (Esc cancels, Backspace clears)
+			table.insert(conns, UIS.InputBegan:Connect(function(input, processed)
+				if input.UserInputType ~= Enum.UserInputType.Keyboard then
+					return
+				end
+				if listening then
+					consumedInput = input
+					if input.KeyCode ~= Enum.KeyCode.Escape then
+						key = (input.KeyCode == Enum.KeyCode.Backspace) and NONE or input.KeyCode
+						if b.OnChange then
+							task.spawn(b.OnChange, key)
+						end
+					end
+					stopListening()
+					return
+				end
+				if processed or key == NONE then
+					return
+				end
+				if input.KeyCode == key and b.Callback then
+					task.spawn(b.Callback, key)
+				end
+			end))
+			if b.Released then
+				table.insert(conns, UIS.InputEnded:Connect(function(input)
+					if not listening and key ~= NONE and input.KeyCode == key then
+						task.spawn(b.Released, key)
+					end
+				end))
+			end
+
+			local obj = {}
+			function obj:Set(k)
+				if k == false then
+					key = NONE
+				else
+					key = toKey(k) or key
+				end
+				paint()
 			end
 			function obj:Get()
 				return key
 			end
-			function obj:Listen()
-				listening = true
-				button.Text = "Press key..."
-			end
-
 			return obj
 		end
 
-		Section.AddKeybind = Section.AddBind
-		Section.AddKeyBind = Section.AddBind
-		Section.CreateBind = Section.AddBind
-		Section.CreateKeybind = Section.AddBind
-		Section.CreateKeyBind = Section.AddBind
-		Section.Bind = Section.AddBind
-		Section.Keybind = Section.AddBind
-		Section.KeyBind = Section.AddBind
-
-		-- Compatibility aliases: keep the original controls/API untouched while
-		-- allowing common naming styles used by existing scripts.
-		Section.CreateButton = Section.AddButton
-		Section.Button = Section.AddButton
-		Section.CreateToggle = Section.AddToggle
-		Section.Toggle = Section.AddToggle
-		Section.CreateSlider = Section.AddSlider
-		Section.Slider = Section.AddSlider
-		Section.CreateDropdown = Section.AddDropdown
-		Section.Dropdown = Section.AddDropdown
-		Section.CreateLabel = Section.AddLabel
-		Section.Label = Section.AddLabel
+		-- every control also answers to the other naming styles (CreateToggle, Toggle, Input, Keybind, ...)
+		-- and accepts the other option names (Title/Text, CurrentValue, Values, Content, ...)
+		for kind, names in pairs(KIND_NAMES) do
+			local raw = Section["Add" .. kind]
+			local function method(self, o, ...)
+				local r = raw(self, normControl(kind, o), ...)
+				if type(r) == "table" then
+					r.SetValue = r.SetValue or r.Set
+					r.GetValue = r.GetValue or r.Get
+					r.SetText = r.SetText or r.Set
+				end
+				return r
+			end
+			Section["Add" .. kind] = method
+			for _, n in ipairs(names) do
+				Section[n] = method
+			end
+		end
 
 		return Section
 	end
 
 	function Window:AddTab(o)
-		o = normalizeOptions(o, "Tab")
-		o.Name = optionName(o, "Tab")
+		if type(o) == "string" then
+			o = { Name = o }
+		end
+		o = copyTable(o or {})
+		o.Name = tostring(firstNonNil(o.Name, o.Title, o.Text, "Tab"))
 		local group
 		if o.Section then
 			group = groups[o.Section]
@@ -2104,11 +2401,35 @@ function MacUI.CreateWindow(opts)
 		themed(page, { ScrollBarImageColor3 = "Off" })
 
 		local Tab = {
-			Name = o.Name, Button = btn, Text = text, Icon = icon, Bar = bar, NoTint = o.NoTint,
+			Name = o.Name, Btn = btn, Text = text, Icon = icon, Bar = bar, NoTint = o.NoTint,
 			Page = page, _sections = {}, _order = 0, HasMatch = true,
 		}
 		function Tab:AddSection(so)
-			return makeSection(Tab, so)
+			if type(so) == "string" then
+				so = { Title = so }
+			end
+			local c = copyTable(so or {})
+			c.Title = firstNonNil(c.Title, c.Name, c.Text)
+			c.Desc = firstNonNil(c.Desc, c.Description)
+			return makeSection(Tab, c)
+		end
+		Tab.CreateSection = Tab.AddSection
+		Tab.NewSection = Tab.AddSection
+		Tab.Section = Tab.AddSection
+
+		-- controls called directly on the tab (Tab:Button, Tab:Toggle, ...) go into an untitled section
+		local looseSection
+		for kind, names in pairs(KIND_NAMES) do
+			local function method(self, o, ...)
+				if not looseSection then
+					looseSection = makeSection(Tab, {})
+				end
+				return looseSection["Add" .. kind](looseSection, o, ...)
+			end
+			Tab["Add" .. kind] = method
+			for _, n in ipairs(names) do
+				Tab[n] = method
+			end
 		end
 		table.insert(tabsList, Tab)
 		if group then
@@ -2130,25 +2451,24 @@ function MacUI.CreateWindow(opts)
 		refreshCurrent()
 		return Tab
 	end
-
-
-	-- Window-level compatibility aliases.
 	Window.CreateTab = Window.AddTab
 	Window.MakeTab = Window.AddTab
+	Window.NewTab = Window.AddTab
+	Window.Tab = Window.AddTab
 
-	-- Some script styles create a section directly from the active window.
-	-- This delegates to the currently selected tab without changing the UI.
-	function Window:AddSection(o)
-		o = normalizeOptions(o, "Section")
-		if not currentTab then
-			error("MacUI: AddSection requires a tab to be created first")
+	-- Window:Section(...) without a tab: goes into an automatic "Main" tab
+	local defaultTab
+	local function defTab()
+		if not defaultTab then
+			defaultTab = Window:AddTab({ Name = opts.DefaultTabName or "Main", Icon = "home" })
 		end
-		return currentTab:AddSection(o)
+		return defaultTab
 	end
-	Window.CreateSection = Window.AddSection
-	Window.Section = Window.AddSection
-
-
+	for _, n in ipairs({ "AddSection", "CreateSection", "NewSection", "Section" }) do
+		Window[n] = function(self, so)
+			return defTab():AddSection(so)
+		end
+	end
 
 	-- settings tab (theme, glass, accent, size)
 	local ui: any = {} -- settings-tab controls, kept in sync with the Window:Set* functions
@@ -2196,10 +2516,10 @@ function MacUI.CreateWindow(opts)
 	end
 
 	function Window:AddSettingsTab(o)
-		o = normalizeOptions(o, "Settings")
+		o = o or {}
 		local tab = Window:AddTab({
 			Section = o.Section or "Settings",
-			Name = optionName(o, "Settings"),
+			Name = o.Name or "Settings",
 			Icon = o.Icon or "gear",
 		})
 
@@ -2276,6 +2596,14 @@ function MacUI.CreateWindow(opts)
 				tween(scaleObj, { Scale = v }, 0.1)
 			end,
 		})
+		toggleBindCtl = win:AddBind({
+			Name = "Toggle UI",
+			Desc = "Click, then press a key. Backspace = none.",
+			Default = (toggleKey ~= NONE_KEY) and toggleKey or false,
+			OnChange = function(k)
+				toggleKey = k
+			end,
+		})
 		win:AddButton({
 			Name = "Unload script",
 			Desc = "Same as the red button.",
@@ -2287,149 +2615,6 @@ function MacUI.CreateWindow(opts)
 		return tab
 	end
 
-
-	-- ==============================================================
-	-- Notifications
-	-- Additive overlay; it does not alter the existing window layout.
-	-- ==============================================================
-	local notifyHolder
-	local activeNotifications = {}
-	local notifyOrder = 0
-
-	local function ensureNotifyHolder()
-		if notifyHolder and notifyHolder.Parent then
-			return notifyHolder
-		end
-		notifyHolder = New("Frame", {
-			Name = "Notifications",
-			AnchorPoint = Vector2.new(1, 1),
-			Position = UDim2.new(1, -18, 1, -18),
-			Size = UDim2.fromOffset(300, 0),
-			AutomaticSize = Enum.AutomaticSize.Y,
-			BackgroundTransparency = 1,
-			Parent = gui,
-			ZIndex = 200,
-		}, {
-			New("UIListLayout", {
-				FillDirection = Enum.FillDirection.Vertical,
-				HorizontalAlignment = Enum.HorizontalAlignment.Right,
-				VerticalAlignment = Enum.VerticalAlignment.Bottom,
-				Padding = UDim.new(0, 8),
-				SortOrder = Enum.SortOrder.LayoutOrder,
-			}),
-		})
-		return notifyHolder
-	end
-
-	local function showNotification(options)
-		if type(options) == "string" then
-			options = { Content = options }
-		end
-		options = options or {}
-
-		notifyOrder += 1
-		local title = tostring(optionName(options, "แจ้งเตือน"))
-		local content = tostring(options.Content or options.Description or options.Text or "")
-		local duration = tonumber(options.Duration) or 3
-		duration = math.max(0, duration)
-
-		local holder = ensureNotifyHolder()
-		local frame = themed(New("Frame", {
-			Size = UDim2.fromOffset(options.Width or 280, 0),
-			AutomaticSize = Enum.AutomaticSize.Y,
-			BackgroundTransparency = 0,
-			BorderSizePixel = 0,
-			LayoutOrder = notifyOrder,
-			ZIndex = 201,
-			Parent = holder,
-		}, {
-			Round(9),
-			Stroke("Stroke"),
-			New("UIPadding", {
-				PaddingTop = UDim.new(0, 10),
-				PaddingBottom = UDim.new(0, 10),
-				PaddingLeft = UDim.new(0, 12),
-				PaddingRight = UDim.new(0, 12),
-			}),
-			New("UIListLayout", {
-				FillDirection = Enum.FillDirection.Vertical,
-				Padding = UDim.new(0, 3),
-				SortOrder = Enum.SortOrder.LayoutOrder,
-			}),
-		}), {
-			BackgroundColor3 = "Card",
-			BackgroundTransparency = "GlassCard",
-		})
-
-		local titleLabel = Label({
-			Text = title,
-			Font = Enum.Font.GothamBold,
-			TextSize = 14,
-			AutomaticSize = Enum.AutomaticSize.Y,
-			Size = UDim2.new(1, 0, 0, 18),
-			LayoutOrder = 1,
-			ZIndex = 202,
-			Parent = frame,
-		}, "Text")
-
-		if content ~= "" then
-			Label({
-				Text = content,
-				TextSize = 12,
-				TextWrapped = true,
-				AutomaticSize = Enum.AutomaticSize.Y,
-				Size = UDim2.new(1, 0, 0, 0),
-				LayoutOrder = 2,
-				ZIndex = 202,
-				Parent = frame,
-			}, "SubText")
-		end
-
-		if options.Accent then
-			local accent = options.Accent
-			if type(accent) == "string" then
-				accent = Accents[accent]
-			end
-			if typeof(accent) == "Color3" then
-				titleLabel.TextColor3 = accent
-			end
-		end
-
-		table.insert(activeNotifications, frame)
-		frame.BackgroundTransparency = 1
-		tween(frame, { BackgroundTransparency = Theme.GlassCard }, 0.18)
-
-		task.delay(duration, function()
-			if not frame.Parent then
-				return
-			end
-			tween(frame, { BackgroundTransparency = 1 }, 0.18)
-			task.wait(0.2)
-			if frame.Parent then
-				frame:Destroy()
-			end
-			for i, item in ipairs(activeNotifications) do
-				if item == frame then
-					table.remove(activeNotifications, i)
-					break
-				end
-			end
-		end)
-
-		return {
-			Close = function()
-				if frame.Parent then
-					frame:Destroy()
-				end
-			end,
-			Instance = frame,
-		}
-	end
-
-	function Window:Notify(options)
-		return showNotification(options)
-	end
-
 	-- window controls
 	local destroyed = false
 	function Window:Destroy()
@@ -2437,17 +2622,14 @@ function MacUI.CreateWindow(opts)
 			return
 		end
 		destroyed = true
-		for _, c in ipairs(conns) do
-			c:Disconnect()
-		end
-		for _, n in ipairs(activeNotifications) do
-			if n and n.Parent then
-				n:Destroy()
+		for i, w in ipairs(MacUI._windows) do
+			if w == Window then
+				table.remove(MacUI._windows, i)
+				break
 			end
 		end
-		table.clear(activeNotifications)
-		if MacUI._lastWindow == Window then
-			MacUI._lastWindow = nil
+		for _, c in ipairs(conns) do
+			c:Disconnect()
 		end
 		gui:Destroy()
 		if opts.OnDestroy then
@@ -2465,6 +2647,34 @@ function MacUI.CreateWindow(opts)
 	function Window:Toggle()
 		toggleMain()
 	end
+	function Window:SetVisible(v)
+		if main.Visible ~= (v == true) then
+			toggleMain()
+		end
+	end
+	function Window:Show()
+		Window:SetVisible(true)
+	end
+	function Window:Hide()
+		Window:SetVisible(false)
+	end
+	function Window:IsVisible()
+		return main.Visible
+	end
+	-- Window:SetToggleKey(Enum.KeyCode.F1) / ("F1") / (false = no keyboard shortcut)
+	function Window:SetToggleKey(k)
+		if k == false or k == "None" then
+			toggleKey = NONE_KEY
+		else
+			toggleKey = toKeyCode(k) or toggleKey
+		end
+		if toggleBindCtl then
+			toggleBindCtl:Set((toggleKey ~= NONE_KEY) and toggleKey or false)
+		end
+	end
+	function Window:GetToggleKey()
+		return toggleKey
+	end
 	function Window:SetUser(t)
 		for k, v in pairs(t or {}) do
 			userInfo[k] = v
@@ -2473,6 +2683,9 @@ function MacUI.CreateWindow(opts)
 	end
 	function Window:ToggleSidebar()
 		onToggleSidebar()
+	end
+	function Window.Notify(a, b)
+		return MacUI.Notify((a == Window) and b or a)
 	end
 
 	onPress(red, function()
@@ -2497,34 +2710,31 @@ function MacUI.CreateWindow(opts)
 		Window:Destroy()
 	end)
 
-	local toggleKey = opts.ToggleKey or Enum.KeyCode.RightShift
+	-- toggle-UI shortcut: ignored while typing in a text box or while a Bind control is waiting for a key
 	table.insert(conns, UIS.InputBegan:Connect(function(input, processed)
-		if not processed and input.KeyCode == toggleKey then
+		if processed or bindBusy or input == consumedInput or toggleKey == NONE_KEY then
+			return
+		end
+		if input.UserInputType == Enum.UserInputType.Keyboard and input.KeyCode == toggleKey then
 			toggleMain()
 		end
 	end))
 
-	-- Keep a reference so MacUI.Notify(...) can target the most recently created window.
-	MacUI._lastWindow = Window
-	Window.Unload = Window.Destroy
-	Window.Close = Window.Destroy
-
+	table.insert(MacUI._windows, Window)
+	MacUI._theme = Theme -- live table, used by notifications
 	return Window
 end
 
--- Library-level notification entry point. It uses the latest created window.
-function MacUI.Notify(selfOrOptions, maybeOptions)
-	local options = maybeOptions
-	if options == nil then
-		options = selfOrOptions
+-- Library.CreateWindow(opts) / Library:CreateWindow(opts) / Library:Window(opts) all work
+function MacUI.CreateWindow(a, b)
+	local o = a
+	if a == MacUI then
+		o = b
 	end
-	if MacUI._lastWindow and MacUI._lastWindow.Notify then
-		return MacUI._lastWindow:Notify(options)
-	end
-	return nil
+	return buildWindow(o)
 end
-MacUI.Notification = MacUI.Notify
-MacUI.Create = MacUI.CreateWindow
-MacUI.NewWindow = MacUI.CreateWindow
+for _, n in ipairs({ "Window", "MakeWindow", "NewWindow", "Create", "CreateLib" }) do
+	MacUI[n] = MacUI.CreateWindow
+end
 
 return MacUI
