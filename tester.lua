@@ -1,4 +1,3 @@
-```lua
 --// =========================================
 --// NYX WHITELIST LOADER
 --// Key + HWID Verification
@@ -525,4 +524,3 @@ print(
 print(
     "[NYX] Expires: " .. tostring(ExpiresAt)
 )
-```
