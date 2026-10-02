@@ -1,30 +1,25 @@
 --==================================================
 -- NYX WHITELIST TESTER
--- Key + HWID + Expiration Countdown
+-- Key + HWID + Profile Countdown
 --==================================================
+
+local Players = game:GetService("Players")
+local HttpService = game:GetService("HttpService")
+
+local LocalPlayer = Players.LocalPlayer
 
 --==================================================
 -- CONFIG
 --==================================================
 
-local API_URL =
-    "https://zerzy.xyz/api/verify.php"
+local API_URL = "https://zerzy.xyz/api/verify.php"
 
 local MACUI_URL =
     "https://raw.githubusercontent.com/chalamkub/Nyx/refs/heads/main/MacUI_Library_v2.lua"
 
 
 --==================================================
--- SERVICES
---==================================================
-
-local Players = game:GetService("Players")
-
-local LocalPlayer = Players.LocalPlayer
-
-
---==================================================
--- GET KEY
+-- KEY
 --==================================================
 
 local Key = getgenv().Key
@@ -38,43 +33,34 @@ Key = tostring(Key)
 
 
 --==================================================
--- GET HWID
+-- HWID
 --==================================================
 
 local function GetHWID()
 
     if typeof(gethwid) == "function" then
-        local success, result = pcall(function()
-            return gethwid()
-        end)
+        local ok, result = pcall(gethwid)
 
-        if success and result then
+        if ok and result then
             return tostring(result)
         end
     end
-
 
     if typeof(get_hwid) == "function" then
-        local success, result = pcall(function()
-            return get_hwid()
-        end)
+        local ok, result = pcall(get_hwid)
 
-        if success and result then
+        if ok and result then
             return tostring(result)
         end
     end
-
 
     if syn and typeof(syn.get_hwid) == "function" then
-        local success, result = pcall(function()
-            return syn.get_hwid()
-        end)
+        local ok, result = pcall(syn.get_hwid)
 
-        if success and result then
+        if ok and result then
             return tostring(result)
         end
     end
-
 
     return nil
 end
@@ -89,23 +75,17 @@ end
 
 
 --==================================================
--- GET REQUEST FUNCTION
+-- REQUEST
 --==================================================
 
 local RequestFunction
 
 if typeof(request) == "function" then
-
     RequestFunction = request
-
 elseif typeof(http_request) == "function" then
-
     RequestFunction = http_request
-
 elseif syn and typeof(syn.request) == "function" then
-
     RequestFunction = syn.request
-
 end
 
 
@@ -116,22 +96,14 @@ end
 
 
 --==================================================
--- JSON SERVICE
---==================================================
-
-local HttpService = game:GetService("HttpService")
-
-
---==================================================
--- VERIFY WHITELIST
+-- VERIFY
 --==================================================
 
 local Response
 
-local success, errorMessage = pcall(function()
+local ok, err = pcall(function()
 
     Response = RequestFunction({
-
         Url = API_URL,
 
         Method = "POST",
@@ -141,30 +113,22 @@ local success, errorMessage = pcall(function()
         },
 
         Body = HttpService:JSONEncode({
-
             key = Key,
-
             hwid = HWID
-
         })
-
     })
 
 end)
 
 
-if not success or not Response then
-
-    LocalPlayer:Kick(
-        "Whitelist API connection failed"
-    )
-
+if not ok or not Response then
+    LocalPlayer:Kick("Whitelist API connection failed")
     return
 end
 
 
 --==================================================
--- GET RESPONSE BODY
+-- RESPONSE
 --==================================================
 
 local Body =
@@ -175,26 +139,16 @@ local Body =
 
 local Data
 
-local DecodeSuccess = pcall(function()
-
+local DecodeOK = pcall(function()
     Data = HttpService:JSONDecode(Body)
-
 end)
 
 
-if not DecodeSuccess or type(Data) ~= "table" then
-
-    LocalPlayer:Kick(
-        "Invalid API response"
-    )
-
+if not DecodeOK or type(Data) ~= "table" then
+    LocalPlayer:Kick("Invalid API response")
     return
 end
 
-
---==================================================
--- CHECK API RESULT
---==================================================
 
 if Data.success ~= true then
 
@@ -210,69 +164,40 @@ end
 
 
 --==================================================
--- GET EXPIRATION
+-- EXPIRES AT
 --==================================================
 
-local ExpiresAt =
-    Data.expires_at
-
+local ExpiresAt = Data.expires_at
 
 if not ExpiresAt then
-
-    LocalPlayer:Kick(
-        "API did not return expiration time"
-    )
-
+    LocalPlayer:Kick("Expiration time missing")
     return
 end
 
 
 --==================================================
--- PARSE PHP DATETIME
---
--- Format:
--- YYYY-MM-DD HH:MM:SS
+-- DATE PARSER
 --==================================================
 
-local function ParseDateTime(DateString)
+local function ParseDateTime(value)
 
-    if not DateString then
-        return nil
-    end
-
-
-    local Year,
-        Month,
-        Day,
-        Hour,
-        Minute,
-        Second =
-        tostring(DateString):match(
+    local y, mo, d, h, mi, s =
+        tostring(value):match(
             "(%d+)%-(%d+)%-(%d+) (%d+):(%d+):(%d+)"
         )
 
-
-    if not Year then
+    if not y then
         return nil
     end
 
-
     return os.time({
-
-        year = tonumber(Year),
-
-        month = tonumber(Month),
-
-        day = tonumber(Day),
-
-        hour = tonumber(Hour),
-
-        min = tonumber(Minute),
-
-        sec = tonumber(Second)
-
+        year = tonumber(y),
+        month = tonumber(mo),
+        day = tonumber(d),
+        hour = tonumber(h),
+        min = tonumber(mi),
+        sec = tonumber(s)
     })
-
 end
 
 
@@ -281,11 +206,7 @@ local ExpireTimestamp =
 
 
 if not ExpireTimestamp then
-
-    LocalPlayer:Kick(
-        "Invalid expiration time"
-    )
-
+    LocalPlayer:Kick("Invalid expiration time")
     return
 end
 
@@ -296,28 +217,23 @@ end
 
 local MacUI
 
-local LibrarySuccess, LibraryError =
-    pcall(function()
+local LibraryOK = pcall(function()
 
-        MacUI = loadstring(
-            game:HttpGet(MACUI_URL)
-        )()
+    MacUI = loadstring(
+        game:HttpGet(MACUI_URL)
+    )()
 
-    end)
+end)
 
 
-if not LibrarySuccess or not MacUI then
-
-    LocalPlayer:Kick(
-        "Failed to load MacUI Library"
-    )
-
+if not LibraryOK or not MacUI then
+    LocalPlayer:Kick("Failed to load MacUI Library")
     return
 end
 
 
 --==================================================
--- CREATE WINDOW
+-- WINDOW
 --==================================================
 
 local Window = MacUI:MakeWindow({
@@ -334,7 +250,7 @@ local Window = MacUI:MakeWindow({
 
 
 --==================================================
--- CREATE MAIN TAB
+-- TAB
 --==================================================
 
 local MainTab = Window:MakeTab({
@@ -368,28 +284,146 @@ end)
 
 
 --==================================================
--- COUNTDOWN UI
---
--- มุมซ้ายล่างของหน้าจอ
+-- WAIT FOR UI
 --==================================================
 
-local ScreenGui = Instance.new(
-    "ScreenGui"
-)
+task.wait(0.5)
 
-ScreenGui.Name =
-    "NyxWhitelistCountdown"
 
-ScreenGui.ResetOnSpawn =
-    false
+--==================================================
+-- FIND PROFILE UI
+--==================================================
 
-ScreenGui.IgnoreGuiInset =
-    true
+local function FindProfileContainer()
 
-ScreenGui.Parent =
-    LocalPlayer:WaitForChild(
-        "PlayerGui"
-    )
+    local PlayerGui =
+        LocalPlayer:WaitForChild("PlayerGui")
+
+    local PossibleNames = {
+
+        "Profile",
+        "profile",
+
+        "User",
+        "user",
+
+        "UserProfile",
+        "UserInfo",
+
+        "Player",
+        "PlayerProfile",
+
+        "ProfileFrame",
+        "UserFrame",
+
+        "Account",
+        "AccountFrame"
+
+    }
+
+
+    -- หาโดยชื่อก่อน
+    for _, gui in ipairs(PlayerGui:GetDescendants()) do
+
+        if gui:IsA("Frame")
+            or gui:IsA("ScrollingFrame")
+            or gui:IsA("CanvasGroup")
+        then
+
+            for _, name in ipairs(PossibleNames) do
+
+                if gui.Name == name then
+                    return gui
+                end
+
+            end
+
+        end
+
+    end
+
+
+    -- หา TextLabel ที่เขียน Profile/User
+    for _, gui in ipairs(PlayerGui:GetDescendants()) do
+
+        if gui:IsA("TextLabel")
+            or gui:IsA("TextButton")
+        then
+
+            local text =
+                string.lower(
+                    tostring(gui.Text or "")
+                )
+
+            if text:find("profile")
+                or text:find("user")
+            then
+
+                local parent = gui.Parent
+
+                if parent then
+                    return parent
+                end
+
+            end
+
+        end
+
+    end
+
+
+    return nil
+end
+
+
+--==================================================
+-- CREATE COUNTDOWN
+--==================================================
+
+local ProfileContainer =
+    FindProfileContainer()
+
+
+--==================================================
+-- FALLBACK
+--==================================================
+
+if not ProfileContainer then
+
+    local PlayerGui =
+        LocalPlayer:WaitForChild("PlayerGui")
+
+    ProfileContainer =
+        Instance.new("Frame")
+
+    ProfileContainer.Name =
+        "NyxProfileCountdown"
+
+    ProfileContainer.Parent =
+        PlayerGui
+
+    ProfileContainer.AnchorPoint =
+        Vector2.new(0, 1)
+
+    ProfileContainer.Position =
+        UDim2.new(
+            0,
+            15,
+            1,
+            -15
+        )
+
+    ProfileContainer.Size =
+        UDim2.new(
+            0,
+            300,
+            0,
+            45
+        )
+
+    ProfileContainer.BackgroundTransparency =
+        1
+end
 
 
 --==================================================
@@ -401,33 +435,11 @@ local CountdownLabel =
 
 
 CountdownLabel.Name =
-    "Countdown"
+    "NyxCountdown"
 
 
 CountdownLabel.Parent =
-    ScreenGui
-
-
-CountdownLabel.AnchorPoint =
-    Vector2.new(0, 1)
-
-
-CountdownLabel.Position =
-    UDim2.new(
-        0,
-        15,
-        1,
-        -15
-    )
-
-
-CountdownLabel.Size =
-    UDim2.new(
-        0,
-        420,
-        0,
-        30
-    )
+    ProfileContainer
 
 
 CountdownLabel.BackgroundTransparency =
@@ -436,6 +448,31 @@ CountdownLabel.BackgroundTransparency =
 
 CountdownLabel.BorderSizePixel =
     0
+
+
+CountdownLabel.Size =
+    UDim2.new(
+        1,
+        -10,
+        0,
+        30
+    )
+
+
+CountdownLabel.Position =
+    UDim2.new(
+        0,
+        5,
+        1,
+        -30
+    )
+
+
+CountdownLabel.AnchorPoint =
+    Vector2.new(
+        0,
+        0
+    )
 
 
 CountdownLabel.TextXAlignment =
@@ -451,7 +488,7 @@ CountdownLabel.Font =
 
 
 CountdownLabel.TextSize =
-    14
+    13
 
 
 CountdownLabel.TextColor3 =
@@ -463,7 +500,7 @@ CountdownLabel.TextColor3 =
 
 
 CountdownLabel.TextStrokeTransparency =
-    0.5
+    0.6
 
 
 CountdownLabel.Text =
@@ -471,95 +508,82 @@ CountdownLabel.Text =
 
 
 --==================================================
--- FORMAT TIME
+-- FORMAT
 --==================================================
 
-local function FormatRemainingTime(
-    Seconds
-)
+local function FormatTime(seconds)
 
-    Seconds =
+    seconds =
         math.max(
             0,
-            math.floor(Seconds)
+            math.floor(seconds)
         )
 
 
-    local Days =
+    local days =
         math.floor(
-            Seconds / 86400
+            seconds / 86400
         )
 
 
-    Seconds =
-        Seconds % 86400
+    seconds =
+        seconds % 86400
 
 
-    local Hours =
+    local hours =
         math.floor(
-            Seconds / 3600
+            seconds / 3600
         )
 
 
-    Seconds =
-        Seconds % 3600
+    seconds =
+        seconds % 3600
 
 
-    local Minutes =
+    local minutes =
         math.floor(
-            Seconds / 60
+            seconds / 60
         )
 
 
-    local RemainingSeconds =
-        Seconds % 60
+    local secs =
+        seconds % 60
 
 
     return string.format(
-
         "%d วัน %d ชั่วโมง %d นาที %d วินาที",
-
-        Days,
-
-        Hours,
-
-        Minutes,
-
-        RemainingSeconds
-
+        days,
+        hours,
+        minutes,
+        secs
     )
-
 end
 
 
 --==================================================
--- COUNTDOWN LOOP
+-- COUNTDOWN
 --==================================================
 
 task.spawn(function()
 
     while true do
 
-        local Remaining =
+        local remaining =
             ExpireTimestamp - os.time()
 
 
-        if Remaining <= 0 then
+        if remaining <= 0 then
 
             CountdownLabel.Text =
                 "เหลือเวลา: หมดอายุแล้ว"
 
-
             break
-
         end
 
 
         CountdownLabel.Text =
             "เหลือเวลา: "
-            .. FormatRemainingTime(
-                Remaining
-            )
+            .. FormatTime(remaining)
 
 
         task.wait(1)
@@ -570,7 +594,7 @@ end)
 
 
 --==================================================
--- TEST BUTTON
+-- BUTTON
 --==================================================
 
 MainTab:AddButton({
@@ -589,7 +613,7 @@ MainTab:AddButton({
 
 
 --==================================================
--- CONSOLE
+-- DEBUG
 --==================================================
 
 print(
@@ -612,5 +636,8 @@ print(
 )
 
 print(
-    "[NYX] Countdown started"
+    "[NYX] Countdown:",
+    FormatTime(
+        ExpireTimestamp - os.time()
+    )
 )
