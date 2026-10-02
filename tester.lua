@@ -1,36 +1,45 @@
---// =========================================
---// NYX WHITELIST LOADER
---// Key + HWID Verification
---// =========================================
+--==================================================
+-- NYX WHITELIST TESTER
+-- Key + HWID + Expiration Countdown
+--==================================================
 
---// =========================
---// CONFIG
---// =========================
+--==================================================
+-- CONFIG
+--==================================================
 
-local API_URL = "https://zerzy.xyz/api/verify.php"
+local API_URL =
+    "https://zerzy.xyz/api/verify.php"
 
 local MACUI_URL =
     "https://raw.githubusercontent.com/chalamkub/Nyx/refs/heads/main/MacUI_Library_v2.lua"
 
 
---// =========================
---// GET KEY
---// =========================
+--==================================================
+-- SERVICES
+--==================================================
+
+local Players = game:GetService("Players")
+
+local LocalPlayer = Players.LocalPlayer
+
+
+--==================================================
+-- GET KEY
+--==================================================
 
 local Key = getgenv().Key
 
-if not Key or Key == "" then
-    game:GetService("Players").LocalPlayer:Kick(
-        "[NYX] กรุณาใส่ Key ก่อนใช้งาน"
-    )
-
+if not Key or tostring(Key) == "" then
+    LocalPlayer:Kick("Whitelist Key is missing")
     return
 end
 
+Key = tostring(Key)
 
---// =========================
---// GET HWID
---// =========================
+
+--==================================================
+-- GET HWID
+--==================================================
 
 local function GetHWID()
 
@@ -73,57 +82,56 @@ end
 
 local HWID = GetHWID()
 
-if not HWID or HWID == "" then
-
-    game:GetService("Players").LocalPlayer:Kick(
-        "[NYX] ไม่สามารถตรวจสอบ HWID ได้"
-    )
-
+if not HWID then
+    LocalPlayer:Kick("Unable to get HWID")
     return
 end
 
 
---// =========================
---// GET REQUEST FUNCTION
---// =========================
+--==================================================
+-- GET REQUEST FUNCTION
+--==================================================
 
-local RequestFunction =
-    request
-    or http_request
-    or (syn and syn.request)
+local RequestFunction
+
+if typeof(request) == "function" then
+
+    RequestFunction = request
+
+elseif typeof(http_request) == "function" then
+
+    RequestFunction = http_request
+
+elseif syn and typeof(syn.request) == "function" then
+
+    RequestFunction = syn.request
+
+end
 
 
 if not RequestFunction then
-
-    game:GetService("Players").LocalPlayer:Kick(
-        "[NYX] Executor ไม่รองรับ HTTP Request"
-    )
-
+    LocalPlayer:Kick("HTTP request is not supported")
     return
 end
 
 
---// =========================
---// JSON ENCODE
---// =========================
+--==================================================
+-- JSON SERVICE
+--==================================================
 
 local HttpService = game:GetService("HttpService")
 
-local RequestBody = HttpService:JSONEncode({
-    key = Key,
-    hwid = HWID
-})
 
-
---// =========================
---// VERIFY KEY
---// =========================
+--==================================================
+-- VERIFY WHITELIST
+--==================================================
 
 local Response
 
-local success, err = pcall(function()
+local success, errorMessage = pcall(function()
 
     Response = RequestFunction({
+
         Url = API_URL,
 
         Method = "POST",
@@ -132,7 +140,14 @@ local success, err = pcall(function()
             ["Content-Type"] = "application/json"
         },
 
-        Body = RequestBody
+        Body = HttpService:JSONEncode({
+
+            key = Key,
+
+            hwid = HWID
+
+        })
+
     })
 
 end)
@@ -140,17 +155,17 @@ end)
 
 if not success or not Response then
 
-    game:GetService("Players").LocalPlayer:Kick(
-        "[NYX] ไม่สามารถเชื่อมต่อเซิร์ฟเวอร์ได้"
+    LocalPlayer:Kick(
+        "Whitelist API connection failed"
     )
 
     return
 end
 
 
---// =========================
---// GET RESPONSE BODY
---// =========================
+--==================================================
+-- GET RESPONSE BODY
+--==================================================
 
 local Body =
     Response.Body
@@ -158,145 +173,152 @@ local Body =
     or ""
 
 
-if Body == "" then
-
-    game:GetService("Players").LocalPlayer:Kick(
-        "[NYX] Server ไม่ส่งข้อมูลกลับมา"
-    )
-
-    return
-end
-
-
---// =========================
---// DECODE JSON
---// =========================
-
 local Data
 
-local DecodeSuccess, DecodeError = pcall(function()
+local DecodeSuccess = pcall(function()
 
     Data = HttpService:JSONDecode(Body)
 
 end)
 
 
-if not DecodeSuccess or not Data then
+if not DecodeSuccess or type(Data) ~= "table" then
 
-    game:GetService("Players").LocalPlayer:Kick(
-        "[NYX] ข้อมูลจาก Server ไม่ถูกต้อง"
+    LocalPlayer:Kick(
+        "Invalid API response"
     )
 
     return
 end
 
 
---// =========================
---// CHECK WHITELIST
---// =========================
+--==================================================
+-- CHECK API RESULT
+--==================================================
 
 if Data.success ~= true then
 
-    local Message =
-        Data.message
-        or "Key ไม่ถูกต้อง"
-
-    game:GetService("Players").LocalPlayer:Kick(
-        "[NYX] " .. tostring(Message)
+    LocalPlayer:Kick(
+        tostring(
+            Data.message
+            or "Whitelist verification failed"
+        )
     )
 
     return
 end
 
 
---// =========================
---// GET EXPIRE TIME
---// =========================
+--==================================================
+-- GET EXPIRATION
+--==================================================
 
-local ExpiresAt = Data.expires_at
+local ExpiresAt =
+    Data.expires_at
+
 
 if not ExpiresAt then
 
-    game:GetService("Players").LocalPlayer:Kick(
-        "[NYX] ไม่พบข้อมูลวันหมดอายุ"
+    LocalPlayer:Kick(
+        "API did not return expiration time"
     )
 
     return
 end
 
 
---// =========================
---// CONVERT PHP DATETIME
---// =========================
---//
---// ตัวอย่าง:
---// 2026-11-01 13:58:43
---//
---// Roblox จะนำไปคำนวณเป็น Unix Timestamp
---//
+--==================================================
+-- PARSE PHP DATETIME
+--
+-- Format:
+-- YYYY-MM-DD HH:MM:SS
+--==================================================
 
 local function ParseDateTime(DateString)
 
-    local Year, Month, Day, Hour, Minute, Second =
-        DateString:match(
+    if not DateString then
+        return nil
+    end
+
+
+    local Year,
+        Month,
+        Day,
+        Hour,
+        Minute,
+        Second =
+        tostring(DateString):match(
             "(%d+)%-(%d+)%-(%d+) (%d+):(%d+):(%d+)"
         )
+
 
     if not Year then
         return nil
     end
 
+
     return os.time({
+
         year = tonumber(Year),
+
         month = tonumber(Month),
+
         day = tonumber(Day),
+
         hour = tonumber(Hour),
+
         min = tonumber(Minute),
+
         sec = tonumber(Second)
+
     })
+
 end
 
 
-local ExpireTimestamp = ParseDateTime(ExpiresAt)
+local ExpireTimestamp =
+    ParseDateTime(ExpiresAt)
+
 
 if not ExpireTimestamp then
 
-    game:GetService("Players").LocalPlayer:Kick(
-        "[NYX] รูปแบบวันหมดอายุไม่ถูกต้อง"
+    LocalPlayer:Kick(
+        "Invalid expiration time"
     )
 
     return
 end
 
 
---// =========================
---// LOAD MACUI
---// =========================
+--==================================================
+-- LOAD MACUI
+--==================================================
 
 local MacUI
 
-local LoadSuccess, LoadError = pcall(function()
+local LibrarySuccess, LibraryError =
+    pcall(function()
 
-    MacUI = loadstring(
-        game:HttpGet(MACUI_URL)
-    )()
+        MacUI = loadstring(
+            game:HttpGet(MACUI_URL)
+        )()
 
-end)
+    end)
 
 
-if not LoadSuccess or not MacUI then
+if not LibrarySuccess or not MacUI then
 
-    game:GetService("Players").LocalPlayer:Kick(
-        "[NYX] ไม่สามารถโหลด UI Library ได้"
+    LocalPlayer:Kick(
+        "Failed to load MacUI Library"
     )
 
     return
 end
 
 
---// =========================
---// CREATE WINDOW
---// =========================
+--==================================================
+-- CREATE WINDOW
+--==================================================
 
 local Window = MacUI:MakeWindow({
 
@@ -311,9 +333,9 @@ local Window = MacUI:MakeWindow({
 })
 
 
---// =========================
---// CREATE MAIN TAB
---// =========================
+--==================================================
+-- CREATE MAIN TAB
+--==================================================
 
 local MainTab = Window:MakeTab({
 
@@ -325,269 +347,231 @@ local MainTab = Window:MakeTab({
 
 })
 
--- ==========================================
--- WHITELIST COUNTDOWN
--- ==========================================
 
-local Players = game:GetService("Players")
-local LocalPlayer = Players.LocalPlayer
-
-local ScreenGui = Instance.new("ScreenGui")
-ScreenGui.Name = "WhitelistCountdown"
-ScreenGui.ResetOnSpawn = false
-ScreenGui.Parent = LocalPlayer:WaitForChild("PlayerGui")
-
-local Countdown = Instance.new("TextLabel")
-Countdown.Name = "Countdown"
-Countdown.Parent = ScreenGui
-
-Countdown.AnchorPoint = Vector2.new(0, 1)
-Countdown.Position = UDim2.new(0, 15, 1, -15)
-Countdown.Size = UDim2.new(0, 320, 0, 30)
-
-Countdown.BackgroundTransparency = 1
-Countdown.TextXAlignment = Enum.TextXAlignment.Left
-Countdown.TextYAlignment = Enum.TextYAlignment.Center
-
-Countdown.Font = Enum.Font.GothamMedium
-Countdown.TextSize = 14
-Countdown.TextColor3 = Color3.fromRGB(255, 255, 255)
-
-Countdown.Text = "เหลือเวลา: กำลังโหลด..."
-
--- ==========================================
--- PARSE EXPIRES_AT
--- ==========================================
-
-local function ParseDateTime(dateString)
-    if not dateString then
-        return nil
-    end
-
-    local year, month, day, hour, minute, second =
-        dateString:match(
-            "(%d+)%-(%d+)%-(%d+) (%d+):(%d+):(%d+)"
-        )
-
-    if not year then
-        return nil
-    end
-
-    return os.time({
-        year = tonumber(year),
-        month = tonumber(month),
-        day = tonumber(day),
-        hour = tonumber(hour),
-        min = tonumber(minute),
-        sec = tonumber(second)
-    })
-end
-
-local ExpireTime = ParseDateTime(Data.expires_at)
-
--- ==========================================
--- UPDATE COUNTDOWN
--- ==========================================
-
-task.spawn(function()
-    while true do
-        if ExpireTime then
-            local Remaining = ExpireTime - os.time()
-
-            if Remaining <= 0 then
-                Countdown.Text = "เหลือเวลา: หมดอายุแล้ว"
-                break
-            end
-
-            local Days = math.floor(Remaining / 86400)
-            Remaining = Remaining % 86400
-
-            local Hours = math.floor(Remaining / 3600)
-            Remaining = Remaining % 3600
-
-            local Minutes = math.floor(Remaining / 60)
-            local Seconds = Remaining % 60
-
-            Countdown.Text = string.format(
-                "เหลือเวลา: %d วัน %d ชั่วโมง %d นาที %d วินาที",
-                Days,
-                Hours,
-                Minutes,
-                Seconds
-            )
-        else
-            Countdown.Text = "เหลือเวลา: ไม่ทราบข้อมูล"
-        end
-
-        task.wait(1)
-    end
-end)
-
---// =========================
---// PROFILE
---// =========================
-
---// แสดงข้อมูล Key / สถานะ / เวลาที่เหลือ
-
-local ProfileLabel
-
-local ProfileText =
-    "Key: " .. tostring(Key) ..
-    "\nสถานะ: Whitelisted"
-
-
---// =========================
---// CREATE PROFILE / INFO
---// =========================
+--==================================================
+-- PROFILE
+--==================================================
 
 pcall(function()
 
-    ProfileLabel = MainTab:AddParagraph({
+    MainTab:AddParagraph({
 
         Title = "Profile",
 
-        Content = ProfileText
+        Content =
+            "Key: " .. Key ..
+            "\nสถานะ: Whitelisted"
 
     })
 
 end)
 
 
---// =========================
---// COUNTDOWN LABEL
---// =========================
+--==================================================
+-- COUNTDOWN UI
+--
+-- มุมซ้ายล่างของหน้าจอ
+--==================================================
 
-local TimeLabel
+local ScreenGui = Instance.new(
+    "ScreenGui"
+)
 
-pcall(function()
+ScreenGui.Name =
+    "NyxWhitelistCountdown"
 
-    TimeLabel = MainTab:AddParagraph({
+ScreenGui.ResetOnSpawn =
+    false
 
-        Title = "Whitelist",
+ScreenGui.IgnoreGuiInset =
+    true
 
-        Content = "กำลังคำนวณเวลาที่เหลือ..."
-
-    })
-
-end)
-
-
---// =========================
---// UPDATE LABEL
---// =========================
-
-local function UpdateTimeLabel()
-
-    local Remaining =
-        ExpireTimestamp - os.time()
+ScreenGui.Parent =
+    LocalPlayer:WaitForChild(
+        "PlayerGui"
+    )
 
 
-    --// หมดอายุ
+--==================================================
+-- COUNTDOWN LABEL
+--==================================================
 
-    if Remaining <= 0 then
-
-        if TimeLabel then
-
-            pcall(function()
-
-                TimeLabel:Set({
-
-                    Title = "Whitelist",
-
-                    Content = "Key หมดอายุแล้ว"
-
-                })
-
-            end)
-
-        end
-
-        return false
-
-    end
+local CountdownLabel =
+    Instance.new("TextLabel")
 
 
-    --// คำนวณเวลา
+CountdownLabel.Name =
+    "Countdown"
+
+
+CountdownLabel.Parent =
+    ScreenGui
+
+
+CountdownLabel.AnchorPoint =
+    Vector2.new(0, 1)
+
+
+CountdownLabel.Position =
+    UDim2.new(
+        0,
+        15,
+        1,
+        -15
+    )
+
+
+CountdownLabel.Size =
+    UDim2.new(
+        0,
+        420,
+        0,
+        30
+    )
+
+
+CountdownLabel.BackgroundTransparency =
+    1
+
+
+CountdownLabel.BorderSizePixel =
+    0
+
+
+CountdownLabel.TextXAlignment =
+    Enum.TextXAlignment.Left
+
+
+CountdownLabel.TextYAlignment =
+    Enum.TextYAlignment.Center
+
+
+CountdownLabel.Font =
+    Enum.Font.GothamMedium
+
+
+CountdownLabel.TextSize =
+    14
+
+
+CountdownLabel.TextColor3 =
+    Color3.fromRGB(
+        255,
+        255,
+        255
+    )
+
+
+CountdownLabel.TextStrokeTransparency =
+    0.5
+
+
+CountdownLabel.Text =
+    "เหลือเวลา: กำลังโหลด..."
+
+
+--==================================================
+-- FORMAT TIME
+--==================================================
+
+local function FormatRemainingTime(
+    Seconds
+)
+
+    Seconds =
+        math.max(
+            0,
+            math.floor(Seconds)
+        )
+
 
     local Days =
-        math.floor(Remaining / 86400)
+        math.floor(
+            Seconds / 86400
+        )
+
+
+    Seconds =
+        Seconds % 86400
+
 
     local Hours =
         math.floor(
-            (Remaining % 86400) / 3600
+            Seconds / 3600
         )
+
+
+    Seconds =
+        Seconds % 3600
+
 
     local Minutes =
         math.floor(
-            (Remaining % 3600) / 60
+            Seconds / 60
         )
 
 
-    local Text =
-        "เหลือเวลา " ..
-        tostring(Days) ..
-        " วัน " ..
-        tostring(Hours) ..
-        " ชั่วโมง " ..
-        tostring(Minutes) ..
-        " นาที"
+    local RemainingSeconds =
+        Seconds % 60
 
 
-    --// อัปเดต UI
+    return string.format(
 
-    if TimeLabel then
+        "%d วัน %d ชั่วโมง %d นาที %d วินาที",
 
-        pcall(function()
+        Days,
 
-            TimeLabel:Set({
+        Hours,
 
-                Title = "Whitelist",
+        Minutes,
 
-                Content = Text
+        RemainingSeconds
 
-            })
-
-        end)
-
-    end
-
-
-    return true
+    )
 
 end
 
 
---// =========================
---// FIRST UPDATE
---// =========================
-
-UpdateTimeLabel()
-
-
---// =========================
---// COUNTDOWN LOOP
---// =========================
+--==================================================
+-- COUNTDOWN LOOP
+--==================================================
 
 task.spawn(function()
 
     while true do
 
-        task.wait(60)
+        local Remaining =
+            ExpireTimestamp - os.time()
 
-        local Active = UpdateTimeLabel()
 
-        if not Active then
+        if Remaining <= 0 then
+
+            CountdownLabel.Text =
+                "เหลือเวลา: หมดอายุแล้ว"
+
+
             break
+
         end
+
+
+        CountdownLabel.Text =
+            "เหลือเวลา: "
+            .. FormatRemainingTime(
+                Remaining
+            )
+
+
+        task.wait(1)
 
     end
 
 end)
 
 
---// =========================
---// MAIN BUTTON
---// =========================
+--==================================================
+-- TEST BUTTON
+--==================================================
 
 MainTab:AddButton({
 
@@ -595,29 +579,38 @@ MainTab:AddButton({
 
     Callback = function()
 
-        print("[NYX] Script is working!")
+        print(
+            "[NYX] Script is working!"
+        )
 
     end
 
 })
 
 
---// =========================
---// SUCCESS LOG
---// =========================
+--==================================================
+-- CONSOLE
+--==================================================
 
 print(
-    "[NYX] Whitelist verified successfully"
+    "[NYX] Whitelist verified"
 )
 
 print(
-    "[NYX] Key: " .. tostring(Key)
+    "[NYX] Key:",
+    Key
 )
 
 print(
-    "[NYX] HWID: " .. tostring(HWID)
+    "[NYX] HWID:",
+    HWID
 )
 
 print(
-    "[NYX] Expires: " .. tostring(ExpiresAt)
+    "[NYX] Expires:",
+    ExpiresAt
+)
+
+print(
+    "[NYX] Countdown started"
 )
