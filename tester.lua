@@ -1,76 +1,106 @@
---[[
-    NYX Whitelist Tester
-    Key + HWID Verification
+--========================================================--
+--                    NYX WHITELIST                       --
+--========================================================--
 
-    API:
-    https://zerzy.xyz/api/verify.php
+print("========================================")
+print("[NYX] Tester starting...")
+print("========================================")
 
-    Loader:
-    getgenv().Key = "YOUR-KEY"
-
-    loadstring(game:HttpGet(
-        "https://raw.githubusercontent.com/chalamkub/Nyx/refs/heads/main/tester.lua"
-    ))()
-]]
+--========================================================--
+-- SERVICES
+--========================================================--
 
 local Players = game:GetService("Players")
 local HttpService = game:GetService("HttpService")
 
 local LocalPlayer = Players.LocalPlayer
 
--- =========================================================
+--========================================================--
 -- CONFIG
--- =========================================================
+--========================================================--
 
 local API_URL = "https://zerzy.xyz/api/verify.php"
 
 local UI_LIBRARY_URL =
     "https://raw.githubusercontent.com/chalamkub/Nyx/refs/heads/main/MacUI_Library_v2.lua"
 
--- =========================================================
--- DEBUG
--- =========================================================
+--========================================================--
+-- SAFE PRINT
+--========================================================--
 
-local function Debug(...)
+local function Log(...)
     print("[NYX]", ...)
 end
 
-local function Fail(Message)
-    warn("[NYX] " .. tostring(Message))
+local function Warn(...)
+    warn("[NYX]", ...)
+end
+
+--========================================================--
+-- ERROR HANDLER
+--========================================================--
+
+local function StopScript(message)
+
+    Warn("========================================")
+    Warn("SCRIPT STOPPED")
+    Warn(tostring(message))
+    Warn("========================================")
 
     if LocalPlayer then
         pcall(function()
-            LocalPlayer:Kick("Whitelist: " .. tostring(Message))
+            LocalPlayer:Kick(
+                "NYX Whitelist\n" ..
+                tostring(message)
+            )
         end)
     end
 end
 
--- =========================================================
+--========================================================--
 -- GET KEY
--- =========================================================
+--========================================================--
+
+Log("Reading Key...")
 
 local Key
 
 local KeySuccess, KeyResult = pcall(function()
+
+    if type(getgenv) ~= "function" then
+        error("getgenv is not available")
+    end
+
     return getgenv().Key
+
 end)
 
-if KeySuccess then
-    Key = KeyResult
+if not KeySuccess then
+    StopScript("ไม่สามารถอ่าน Key ได้")
+    return
 end
 
-if not Key or tostring(Key) == "" then
-    Fail("ไม่พบ Key")
+Key = KeyResult
+
+if Key == nil then
+    StopScript("ไม่พบ getgenv().Key")
     return
 end
 
 Key = tostring(Key)
 
-Debug("Key:", Key)
+if Key == "" then
+    StopScript("Key เป็นค่าว่าง")
+    return
+end
 
--- =========================================================
+Log("Key:", Key)
+
+--========================================================--
 -- GET HWID
--- =========================================================
+--========================================================--
+
+Log("Reading HWID...")
 
 local function GetHWID()
 
@@ -81,10 +111,16 @@ local function GetHWID()
             return gethwid()
         end)
 
-        if Success and Result and tostring(Result) ~= "" then
-            Debug("HWID source: gethwid")
-            return tostring(Result)
+        if Success and Result then
+
+            Result = tostring(Result)
+
+            if Result ~= "" and Result ~= "nil" then
+                return Result, "gethwid"
+            end
+
         end
+
     end
 
     -- get_hwid
@@ -94,10 +130,16 @@ local function GetHWID()
             return get_hwid()
         end)
 
-        if Success and Result and tostring(Result) ~= "" then
-            Debug("HWID source: get_hwid")
-            return tostring(Result)
+        if Success and Result then
+
+            Result = tostring(Result)
+
+            if Result ~= "" and Result ~= "nil" then
+                return Result, "get_hwid"
+            end
+
         end
+
     end
 
     -- syn.get_hwid
@@ -107,58 +149,66 @@ local function GetHWID()
             return syn.get_hwid()
         end)
 
-        if Success and Result and tostring(Result) ~= "" then
-            Debug("HWID source: syn.get_hwid")
-            return tostring(Result)
+        if Success and Result then
+
+            Result = tostring(Result)
+
+            if Result ~= "" and Result ~= "nil" then
+                return Result, "syn.get_hwid"
+            end
+
         end
+
     end
 
-    return nil
+    return nil, nil
 end
 
-local HWID = GetHWID()
+local HWID, HWIDSource = GetHWID()
 
 if not HWID then
-    Fail("ไม่สามารถอ่าน HWID ได้")
+    StopScript("ไม่สามารถอ่าน HWID ได้")
     return
 end
 
-Debug("HWID:", HWID)
+Log("HWID source:", HWIDSource)
+Log("HWID:", HWID)
 
--- =========================================================
+--========================================================--
 -- GET REQUEST FUNCTION
--- =========================================================
+--========================================================--
 
-local function GetRequestFunction()
+Log("Checking HTTP request...")
 
-    if type(request) == "function" then
-        Debug("HTTP function: request")
-        return request
-    end
+local Request
 
-    if type(http_request) == "function" then
-        Debug("HTTP function: http_request")
-        return http_request
-    end
+if type(request) == "function" then
 
-    if syn and type(syn.request) == "function" then
-        Debug("HTTP function: syn.request")
-        return syn.request
-    end
+    Request = request
+    Log("HTTP method: request")
 
-    return nil
+elseif type(http_request) == "function" then
+
+    Request = http_request
+    Log("HTTP method: http_request")
+
+elseif syn and type(syn.request) == "function" then
+
+    Request = syn.request
+    Log("HTTP method: syn.request")
+
 end
-
-local Request = GetRequestFunction()
 
 if not Request then
-    Fail("Executor ไม่มี HTTP Request function")
+    StopScript("ไม่พบ HTTP request function")
     return
 end
 
--- =========================================================
+--========================================================--
 -- CREATE JSON
--- =========================================================
+--========================================================--
+
+Log("Creating JSON...")
 
 local EncodeSuccess, RequestBody = pcall(function()
 
@@ -170,21 +220,23 @@ local EncodeSuccess, RequestBody = pcall(function()
 end)
 
 if not EncodeSuccess then
-    Fail("ไม่สามารถสร้าง JSON ได้")
+    StopScript("สร้าง JSON ไม่สำเร็จ: " .. tostring(RequestBody))
     return
 end
 
-Debug("Request Body:")
+Log("Request body:")
 print(RequestBody)
 
--- =========================================================
+--========================================================--
 -- SEND API REQUEST
--- =========================================================
+--========================================================--
 
-Debug("API:", API_URL)
-Debug("Sending POST request...")
+Log("========================================")
+Log("Sending whitelist request...")
+Log("API:", API_URL)
+Log("========================================")
 
-local RequestSuccess, RequestResult = pcall(function()
+local RequestSuccess, Response = pcall(function()
 
     return Request({
 
@@ -203,68 +255,92 @@ local RequestSuccess, RequestResult = pcall(function()
 
 end)
 
--- =========================================================
+--========================================================--
 -- REQUEST ERROR
--- =========================================================
+--========================================================--
 
 if not RequestSuccess then
 
-    warn("======================================")
-    warn("[NYX] REQUEST ERROR")
-    warn("======================================")
-    warn(tostring(RequestResult))
-    warn("======================================")
+    Warn("========================================")
+    Warn("HTTP REQUEST ERROR")
+    Warn("========================================")
+    Warn(tostring(Response))
+    Warn("========================================")
 
-    Fail("ส่ง Request ไป API ไม่สำเร็จ")
+    StopScript("ส่งข้อมูลไป API ไม่สำเร็จ")
     return
 end
 
-if not RequestResult then
-    Fail("API ไม่ส่ง Response กลับมา")
+if Response == nil then
+    StopScript("API ไม่ส่ง Response กลับมา")
     return
 end
 
--- =========================================================
--- RESPONSE
--- =========================================================
+--========================================================--
+-- READ STATUS
+--========================================================--
 
-local StatusCode = RequestResult.StatusCode
-local ResponseBody = RequestResult.Body
+local StatusCode = Response.StatusCode
+local Status = Response.Status
 
-warn("======================================")
-warn("[NYX] API RESPONSE")
-warn("======================================")
+Log("========================================")
+Log("API RESPONSE")
+Log("========================================")
 
-warn("StatusCode:")
-warn(tostring(StatusCode))
+Log("StatusCode:", tostring(StatusCode))
+Log("Status:", tostring(Status))
 
-warn("Status:")
-warn(tostring(RequestResult.Status))
+--========================================================--
+-- READ BODY
+--========================================================--
 
-warn("Body:")
-warn(tostring(ResponseBody))
+local ResponseBody = Response.Body
 
-warn("======================================")
+if ResponseBody == nil then
 
--- =========================================================
--- CHECK RESPONSE
--- =========================================================
+    -- บาง environment อาจใช้ Body เป็นข้อมูลอื่น
+    Warn("Response.Body is nil")
 
-if not ResponseBody then
-    Fail("API ไม่มี Response Body")
+    -- ลองดู response ทั้งหมด
+    Warn("Response type:", type(Response))
+
+    StopScript("API ไม่มี Response Body")
     return
 end
 
 ResponseBody = tostring(ResponseBody)
 
+Log("Body:")
+print(ResponseBody)
+
+Log("========================================")
+
+--========================================================--
+-- HTTP STATUS CHECK
+--========================================================--
+
+if StatusCode and tonumber(StatusCode) ~= 200 then
+
+    Warn("API returned HTTP status:", tostring(StatusCode))
+
+    -- พยายามอ่าน JSON ต่อก่อน
+    -- เพราะบาง API สามารถส่ง JSON error พร้อม 4xx ได้
+end
+
+--========================================================--
+-- CHECK EMPTY RESPONSE
+--========================================================--
+
 if ResponseBody == "" then
-    Fail("API ส่ง Response ว่างกลับมา")
+    StopScript("API ส่ง Response ว่าง")
     return
 end
 
--- =========================================================
+--========================================================--
 -- DECODE JSON
--- =========================================================
+--========================================================--
+
+Log("Decoding JSON...")
 
 local DecodeSuccess, Data = pcall(function()
 
@@ -274,107 +350,125 @@ end)
 
 if not DecodeSuccess then
 
-    warn("======================================")
-    warn("[NYX] JSON DECODE ERROR")
-    warn("======================================")
+    Warn("========================================")
+    Warn("JSON DECODE ERROR")
+    Warn("========================================")
 
-    warn("Raw Response:")
-    warn(ResponseBody)
+    Warn("Raw API Response:")
+    Warn(ResponseBody)
 
-    warn("======================================")
+    Warn("========================================")
 
-    Fail("Server ส่งข้อมูลไม่ถูกต้อง")
+    StopScript("Server ส่งข้อมูลไม่ใช่ JSON")
     return
 end
 
 if type(Data) ~= "table" then
-    Fail("รูปแบบข้อมูลจาก Server ไม่ถูกต้อง")
+    StopScript("รูปแบบ JSON จาก Server ไม่ถูกต้อง")
     return
 end
 
--- =========================================================
--- API RESULT
--- =========================================================
+--========================================================--
+-- READ API DATA
+--========================================================--
 
-local Success = Data.success
-local Message = tostring(Data.message or "")
+local APISuccess = Data.success
+local APIMessage = tostring(Data.message or "")
 local ExpiresAt = tostring(Data.expires_at or "")
 
-Debug("API success:", tostring(Success))
-Debug("API message:", Message)
-Debug("Expires:", ExpiresAt)
+Log("API success:", tostring(APISuccess))
+Log("API message:", APIMessage)
+Log("API expires:", ExpiresAt)
 
--- =========================================================
+--========================================================--
 -- WHITELIST FAILED
--- =========================================================
+--========================================================--
 
-if Success ~= true then
+if APISuccess ~= true then
 
-    warn("======================================")
-    warn("[NYX] WHITELIST FAILED")
-    warn("======================================")
+    Warn("========================================")
+    Warn("WHITELIST FAILED")
+    Warn("========================================")
 
-    warn("Reason:", Message)
+    Warn("Message:", APIMessage)
 
-    warn("======================================")
+    Warn("========================================")
 
-    Fail(Message ~= "" and Message or "Whitelist verification failed")
+    StopScript(
+        APIMessage ~= ""
+        and APIMessage
+        or "Whitelist verification failed"
+    )
+
     return
 end
 
--- =========================================================
+--========================================================--
 -- WHITELIST SUCCESS
--- =========================================================
+--========================================================--
 
-print("======================================")
-print("[NYX] WHITELIST SUCCESS")
-print("======================================")
+Log("========================================")
+Log("WHITELIST SUCCESS")
+Log("========================================")
 
-print("Key:", Key)
-print("HWID:", HWID)
-print("Message:", Message)
-print("Expires:", ExpiresAt)
+Log("Key:", Key)
+Log("HWID:", HWID)
+Log("Expires:", ExpiresAt)
 
-print("======================================")
+Log("========================================")
 
--- =========================================================
+--========================================================--
 -- LOAD UI LIBRARY
--- =========================================================
+--========================================================--
 
-Debug("Loading UI Library...")
+Log("Loading MacUI Library...")
 
-local UISuccess, MacUI = pcall(function()
+local UILoadSuccess, MacUI = pcall(function()
 
-    return loadstring(
-        game:HttpGet(UI_LIBRARY_URL)
-    )()
+    local Source = game:HttpGet(UI_LIBRARY_URL)
+
+    if not Source or Source == "" then
+        error("UI Library source is empty")
+    end
+
+    Log("UI source downloaded:", #Source, "characters")
+
+    local Loader = loadstring(Source)
+
+    if type(Loader) ~= "function" then
+        error("loadstring did not return function")
+    end
+
+    return Loader()
 
 end)
 
-if not UISuccess then
+if not UILoadSuccess then
 
-    warn("======================================")
-    warn("[NYX] UI LIBRARY ERROR")
-    warn("======================================")
+    Warn("========================================")
+    Warn("UI LIBRARY ERROR")
+    Warn("========================================")
 
-    warn(tostring(MacUI))
+    Warn(tostring(MacUI))
 
-    warn("======================================")
+    Warn("========================================")
 
-    Fail("โหลด UI Library ไม่สำเร็จ")
+    StopScript("โหลด UI Library ไม่สำเร็จ")
     return
 end
 
-if not MacUI then
-    Fail("UI Library ไม่ส่ง Library กลับมา")
+if type(MacUI) ~= "table" then
+    StopScript("MacUI Library ไม่ได้ส่ง table กลับมา")
     return
 end
 
-Debug("UI Library loaded successfully")
+Log("MacUI Library loaded")
 
--- =========================================================
+--========================================================--
 -- CREATE WINDOW
--- =========================================================
+--========================================================--
+
+Log("Creating Window...")
 
 local WindowSuccess, Window = pcall(function()
 
@@ -394,16 +488,25 @@ end)
 
 if not WindowSuccess then
 
-    warn("[NYX] MakeWindow Error:")
-    warn(tostring(Window))
+    Warn("MakeWindow error:")
+    Warn(tostring(Window))
 
-    Fail("สร้าง UI ไม่สำเร็จ")
+    StopScript("สร้าง Window ไม่สำเร็จ")
     return
 end
 
--- =========================================================
+if not Window then
+    StopScript("MakeWindow ไม่ได้ส่ง Window กลับมา")
+    return
+end
+
+Log("Window created")
+
+--========================================================--
 -- CREATE TAB
--- =========================================================
+--========================================================--
+
+Log("Creating Main Tab...")
 
 local TabSuccess, MainTab = pcall(function()
 
@@ -421,26 +524,39 @@ end)
 
 if not TabSuccess then
 
-    warn("[NYX] MakeTab Error:")
-    warn(tostring(MainTab))
+    Warn("MakeTab error:")
+    Warn(tostring(MainTab))
 
-    Fail("สร้าง Tab ไม่สำเร็จ")
+    StopScript("สร้าง Tab ไม่สำเร็จ")
     return
 end
 
--- =========================================================
--- BUTTON
--- =========================================================
+if not MainTab then
+    StopScript("MakeTab ไม่ได้ส่ง Tab กลับมา")
+    return
+end
 
-local ButtonSuccess, ButtonError = pcall(function()
+Log("Main Tab created")
 
-    MainTab:AddButton({
+--========================================================--
+-- ADD BUTTON
+--========================================================--
+
+Log("Creating button...")
+
+local ButtonSuccess, ButtonResult = pcall(function()
+
+    return MainTab:AddButton({
 
         Name = "ฟังก์ชันทำงาน",
 
         Callback = function()
 
+            print("========================================")
             print("[NYX] Script is working!")
+            print("[NYX] Whitelist: ACTIVE")
+            print("[NYX] Expires:", ExpiresAt)
+            print("========================================")
 
         end
 
@@ -450,22 +566,22 @@ end)
 
 if not ButtonSuccess then
 
-    warn("[NYX] AddButton Error:")
-    warn(tostring(ButtonError))
+    Warn("AddButton error:")
+    Warn(tostring(ButtonResult))
 
-    Fail("สร้างปุ่มไม่สำเร็จ")
+    StopScript("สร้างปุ่มไม่สำเร็จ")
     return
 end
 
--- =========================================================
--- COMPLETE
--- =========================================================
+--========================================================--
+-- FINISHED
+--========================================================--
 
-print("======================================")
+print("")
+print("========================================")
 print("[NYX] SCRIPT LOADED SUCCESSFULLY")
-print("======================================")
-
-print("Whitelist: ACTIVE")
-print("Expires:", ExpiresAt)
-
-print("======================================")
+print("========================================")
+print("Whitelist : ACTIVE")
+print("Key       :", Key)
+print("Expires   :", ExpiresAt)
+print("========================================")
