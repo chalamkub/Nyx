@@ -1,5 +1,5 @@
 --==================================================
--- NYX WHITELIST (รองรับคีย์ถาวร + แสดงเวลาในโปรไฟล์ MacUI)
+-- NYX WHITELIST (รองรับคีย์ถาวร + แสดงเวลาในโปรไฟล์ MacUI V3)
 --==================================================
 
 local Players = game:GetService("Players")
@@ -137,24 +137,32 @@ end)
 
 
 --==================================================
--- การนำเวลาไปแทรกในหน้าโปรไฟล์ MacUI
+-- ค้นหาป้ายชื่อโปรไฟล์ (SMART SCANNER)
 --==================================================
 
--- รอเวลาสักครู่ให้ MacUI ทำการสร้างหน้าต่าง UI จนเสร็จสมบูรณ์
-task.wait(1.5) 
-
--- ฟังก์ชันสำหรับค้นหาป้ายชื่อ (TextLabel) ของผู้เล่นใน MacUI
-local function FindMacUIProfileNameLabel()
-    local targetParent = (typeof(gethui) == "function" and gethui()) or game:GetService("CoreGui")
+local function FindProfileLabel()
     local pName = LocalPlayer.Name
     local pDisp = LocalPlayer.DisplayName
+    
+    -- รูปแบบชื่อที่เป็นไปได้ใน UI
+    local checkTexts = { 
+        pName, 
+        pDisp, 
+        "@" .. pName, 
+        pDisp .. " (@" .. pName .. ")" 
+    }
+    
+    -- ค้นหาครอบคลุมทุกที่ที่ Executor มักจะนำ UI ไปซ่อนไว้ (รองรับ Delta)
+    local containers = {}
+    if typeof(gethui) == "function" then table.insert(containers, gethui()) end
+    table.insert(containers, game:GetService("CoreGui"))
+    if LocalPlayer:FindFirstChild("PlayerGui") then table.insert(containers, LocalPlayer.PlayerGui) end
 
-    for _, gui in ipairs(targetParent:GetDescendants()) do
-        if gui:IsA("TextLabel") and (gui.Text == pName or gui.Text == pDisp) then
-            -- เช็กให้ชัวร์ว่าเป็นโซนโปรไฟล์ โดยดูว่ามีรูปภาพอวาตาร์ (ImageLabel) อยู่ข้างๆ ไหม
-            if gui.Parent then
-                for _, sibling in ipairs(gui.Parent:GetChildren()) do
-                    if sibling:IsA("ImageLabel") or sibling:IsA("ImageButton") then
+    for _, container in ipairs(containers) do
+        for _, gui in ipairs(container:GetDescendants()) do
+            if gui:IsA("TextLabel") then
+                for _, textToMatch in ipairs(checkTexts) do
+                    if gui.Text == textToMatch then
                         return gui
                     end
                 end
@@ -164,18 +172,32 @@ local function FindMacUIProfileNameLabel()
     return nil
 end
 
-local ProfileNameLabel = FindMacUIProfileNameLabel()
+-- วนลูปค้นหาป้ายชื่อ สูงสุด 5 วินาที (รอ UI โหลด)
+local ProfileNameLabel = nil
+for i = 1, 10 do
+    ProfileNameLabel = FindProfileLabel()
+    if ProfileNameLabel then break end
+    task.wait(0.5)
+end
+
 local OriginalNameText = LocalPlayer.DisplayName
 
 if ProfileNameLabel then
     OriginalNameText = ProfileNameLabel.Text
-    ProfileNameLabel.RichText = true -- เปิดใช้งานแท็กจัดรูปแบบข้อความ
+    ProfileNameLabel.RichText = true
     ProfileNameLabel.TextScaled = false
-    ProfileNameLabel.TextSize = 14
+    
+    -- ขยายกล่องข้อความลงมา 18 พิกเซล เพื่อกันไม่ให้บรรทัดเวลาโดนตัดทิ้ง
+    pcall(function()
+        ProfileNameLabel.Size = UDim2.new(
+            ProfileNameLabel.Size.X.Scale, ProfileNameLabel.Size.X.Offset,
+            ProfileNameLabel.Size.Y.Scale, ProfileNameLabel.Size.Y.Offset + 18
+        )
+    end)
 end
 
 
---================ FALLBACK UI (กรณีหาหน้าโปรไฟล์ MacUI ไม่เจอ) ================
+--================ FALLBACK UI ================
 local CountdownLabel
 if not ProfileNameLabel then
     local ScreenGui = Instance.new("ScreenGui")
@@ -222,11 +244,10 @@ local function FormatTime(seconds)
     local minutes = math.floor(seconds / 60)
     local secs = seconds % 60
     
-    -- ทำคำให้สั้นลงเพื่อไม่ให้ล้นกรอบโปรไฟล์ของ MacUI
     if days > 0 then
         return string.format("%d วัน %d ชม. %d นาที", days, hours, minutes)
     else
-        return string.format("%d ชม. %d นาที %d วินาที", hours, minutes, secs)
+        return string.format("%d ชม. %d นาที %d วิ", hours, minutes, secs)
     end
 end
 
@@ -235,7 +256,6 @@ end
 task.spawn(function()
     if IsLifetime then
         if ProfileNameLabel then
-            -- แทรกบรรทัดใหม่ (\n) เพื่อให้เวลาไปอยู่ใต้ชื่อ พร้อมปรับสีและขนาดอักษรให้ดูสวยงาม
             ProfileNameLabel.Text = OriginalNameText .. "\n<font color='rgb(170,170,170)' size='11'>สถานะ: ถาวร</font>"
         else
             CountdownLabel.Text = "เหลือเวลา: ถาวร"
