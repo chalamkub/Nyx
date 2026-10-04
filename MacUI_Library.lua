@@ -56,6 +56,9 @@
 --   Wally     : Library:CreateWindow("name") then window:Section / Toggle / Button / Slider / Dropdown / Bind / Box / ColorPicker
 --               with option tables { flag = .., location = .. } (location[flag] is kept up to date)
 --   Config    : Window:SaveConfig(name) / LoadConfig(name) save every control that has a flag / idx (needs writefile).
+--   Any other name: method names are matched by meaning, so AddFancySwitch / CreateCheckbox / NewRangeBar / MakeGroup /
+--               AddHotkey ... work too (toggle, button, slider, dropdown, textbox, bind, color picker, label, section, tab ...).
+--               Dot calls without self (Tab.Button({...})) work. Unknown "AddSomething" names are ignored with one warning.
 --   Not supported (accepted but ignored): key systems, loading screens, watermark, add-on managers (SaveManager,
 --   ThemeManager, InterfaceManager), image / video rows.
 --
@@ -844,6 +847,129 @@ local function unself(a, ...)
 		return ...
 	end
 	return a, ...
+end
+
+-- ============================================================================
+-- FUZZY METHOD NAMES: any method name that looks like "add / create / new / make + a control word" is understood
+-- (AddFancySwitch, createcheckbox, NewRangeBar, MakeGroup ...). Unknown "AddSomething" names do nothing
+-- instead of raising an error, so scripts written for other libraries keep running.
+-- ============================================================================
+local VERBS = { "add", "create", "new", "make", "build", "insert", "append", "register", "draw", "render", "spawn" }
+local BARE = {
+	toggle = 1, switch = 1, checkbox = 1, button = 1, btn = 1, slider = 1, dropdown = 1, textbox = 1, input = 1,
+	keybind = 1, bind = 1, colorpicker = 1, label = 1, paragraph = 1, divider = 1, separator = 1, section = 1,
+	tab = 1, page = 1, notify = 1, notification = 1, dialog = 1, window = 1,
+}
+-- { keyword, category, kind } - the first keyword contained in the name wins, so order matters
+local KEYWORDS = {
+	{ "tabbox", "tabbox" },
+	{ "groupbox", "section" }, { "section", "section" }, { "group", "section" }, { "folder", "section" },
+	{ "category", "section" }, { "panel", "section" }, { "card", "section" }, { "container", "section" },
+	{ "colorpicker", "control", "ColorPicker" }, { "colourpicker", "control", "ColorPicker" },
+	{ "color", "control", "ColorPicker" }, { "colour", "control", "ColorPicker" }, { "palette", "control", "ColorPicker" },
+	{ "keybind", "control", "Bind" }, { "keypicker", "control", "Bind" }, { "hotkey", "control", "Bind" },
+	{ "shortcut", "control", "Bind" }, { "bind", "control", "Bind" }, { "key", "control", "Bind" },
+	{ "checkbox", "control", "Toggle" }, { "tickbox", "control", "Toggle" }, { "toggle", "control", "Toggle" },
+	{ "switch", "control", "Toggle" }, { "check", "control", "Toggle" }, { "onoff", "control", "Toggle" },
+	{ "enable", "control", "Toggle" },
+	{ "textbox", "control", "Textbox" }, { "textinput", "control", "Textbox" }, { "input", "control", "Textbox" },
+	{ "field", "control", "Textbox" }, { "entry", "control", "Textbox" }, { "editbox", "control", "Textbox" },
+	{ "box", "control", "Textbox" },
+	{ "slider", "control", "Slider" }, { "range", "control", "Slider" },
+	{ "dropdown", "control", "Dropdown" }, { "combo", "control", "Dropdown" }, { "select", "control", "Dropdown" },
+	{ "choose", "control", "Dropdown" }, { "listbox", "control", "Dropdown" }, { "menu", "control", "Dropdown" },
+	{ "option", "control", "Dropdown" }, { "list", "control", "Dropdown" }, { "picker", "control", "Dropdown" },
+	{ "button", "control", "Button" }, { "btn", "control", "Button" }, { "click", "control", "Button" },
+	{ "action", "control", "Button" },
+	{ "divider", "divider" }, { "separator", "divider" }, { "seperator", "divider" }, { "hr", "divider" },
+	{ "line", "divider" }, { "rule", "divider" },
+	{ "blank", "blank" }, { "spacer", "blank" }, { "space", "blank" }, { "gap", "blank" }, { "padding", "blank" },
+	{ "notif", "notify" }, { "toast", "notify" }, { "alert", "notify" }, { "popup", "notify" },
+	{ "dialog", "dialog" }, { "prompt", "dialog" }, { "confirm", "dialog" }, { "modal", "dialog" },
+	{ "window", "window" }, { "tab", "tab" }, { "page", "tab" },
+	{ "label", "control", "Label" }, { "paragraph", "control", "Label" }, { "text", "control", "Label" },
+	{ "title", "control", "Label" }, { "heading", "control", "Label" }, { "info", "control", "Label" },
+	{ "note", "control", "Label" }, { "status", "control", "Label" }, { "message", "control", "Label" },
+	{ "content", "control", "Label" }, { "description", "control", "Label" }, { "display", "control", "Label" },
+}
+
+-- returns category, kind  (category = control / section / tabbox / divider / blank / notify / dialog / window / tab /
+-- unknown) or nil when the name does not look like a builder call
+local function classifyName(key)
+	if type(key) ~= "string" or key == "" or string.sub(key, 1, 1) == "_" then
+		return nil
+	end
+	local low = string.lower(key)
+	local rest, hasVerb = low, false
+	for _, v in ipairs(VERBS) do
+		if #low > #v and string.sub(low, 1, #v) == v then
+			rest, hasVerb = string.sub(low, #v + 1), true
+			break
+		end
+	end
+	rest = string.gsub(rest, "[^a-z]", "")
+	if rest == "" then
+		return nil
+	end
+	if not hasVerb and not BARE[rest] then
+		return nil
+	end
+	for _, k in ipairs(KEYWORDS) do
+		if string.find(rest, k[1], 1, true) then
+			return k[2], k[3]
+		end
+	end
+	return hasVerb and "unknown" or nil
+end
+
+-- an object that accepts any call and any field and always answers with itself (used for unknown builder names)
+local Dummy
+Dummy = setmetatable({}, {
+	__index = function()
+		return function()
+			return Dummy
+		end
+	end,
+	__call = function()
+		return Dummy
+	end,
+})
+local warnedNames = {}
+local function unknownBuilder(key)
+	if not warnedNames[key] then
+		warnedNames[key] = true
+		warn("[MacUI] '" .. tostring(key) .. "' is not supported by this library and was ignored")
+	end
+	return function()
+		return Dummy
+	end
+end
+
+-- first argument may be the object (colon call) or already the real first argument (dot call)
+local function shift(self, scope, ...)
+	if self == scope then
+		return ...
+	end
+	return self, ...
+end
+
+-- makes `scope` answer unknown builder names: handlers[category](kind, key) must return the function to call
+local function installFuzzy(scope, handlers)
+	setmetatable(scope, {
+		__index = function(t, key)
+			local cat, kind = classifyName(key)
+			if not cat then
+				return nil
+			end
+			local h = handlers[cat]
+			local fn = h and h(kind, key)
+			if fn == nil then
+				fn = unknownBuilder(key)
+			end
+			rawset(t, key, fn)
+			return fn
+		end,
+	})
 end
 
 MacUI.Flags, MacUI.Options, MacUI.Toggles = {}, {}, {}
@@ -3244,8 +3370,8 @@ local function buildWindow(opts)
 		end
 		for kind, names in pairs(KIND_NAMES) do
 			local function install(nm)
-				Section[nm] = function(_, ...)
-					return dispatch(kind, nm, ...)
+				Section[nm] = function(self, ...)
+					return dispatch(kind, nm, shift(self, Section, ...))
 				end
 			end
 			install("Add" .. kind)
@@ -3341,6 +3467,33 @@ local function buildWindow(opts)
 		end
 		Section.AddVideo = Section.AddImage
 
+		installFuzzy(Section, {
+			control = function(kind)
+				return function(self, ...)
+					return Section["Add" .. kind](Section, shift(self, Section, ...))
+				end
+			end,
+			divider = function()
+				return function()
+					return Section.AddDivider(Section)
+				end
+			end,
+			blank = function()
+				return function(self, ...)
+					return Section.AddBlank(Section, shift(self, Section, ...))
+				end
+			end,
+			section = function() -- nested groups are not supported: the call returns this section
+				return function()
+					return Section
+				end
+			end,
+			notify = function()
+				return function(self, ...)
+					return MacUI.Notify(shift(self, Section, ...))
+				end
+			end,
+		})
 		return Section
 	end
 
@@ -3465,6 +3618,12 @@ local function buildWindow(opts)
 			Tab._current = sec
 			return sec
 		end
+		do
+			local rawAddSection = Tab.AddSection
+			Tab.AddSection = function(self, ...)
+				return rawAddSection(Tab, shift(self, Tab, ...))
+			end
+		end
 		for _, nm in ipairs(SECTION_NAMES) do
 			Tab[nm] = Tab.AddSection
 		end
@@ -3489,9 +3648,9 @@ local function buildWindow(opts)
 			return Tab._current
 		end
 		local function route(nm)
-			Tab[nm] = function(_, ...)
+			Tab[nm] = function(self, ...)
 				local sec = current()
-				return sec[nm](sec, ...)
+				return sec[nm](sec, shift(self, Tab, ...))
 			end
 		end
 		for kind, names in pairs(KIND_NAMES) do
@@ -3506,6 +3665,37 @@ local function buildWindow(opts)
 		for _, nm in ipairs(BLANK_NAMES) do
 			route(nm)
 		end
+		installFuzzy(Tab, {
+			control = function(kind)
+				return function(self, ...)
+					local sec = current()
+					return sec["Add" .. kind](sec, shift(self, Tab, ...))
+				end
+			end,
+			divider = function()
+				return function()
+					return current():AddDivider()
+				end
+			end,
+			blank = function()
+				return function(self, ...)
+					return current():AddBlank(shift(self, Tab, ...))
+				end
+			end,
+			section = function()
+				return function(self, ...)
+					return Tab.AddSection(Tab, shift(self, Tab, ...))
+				end
+			end,
+			tabbox = function()
+				return newTabbox
+			end,
+			notify = function()
+				return function(self, ...)
+					return MacUI.Notify(shift(self, Tab, ...))
+				end
+			end,
+		})
 		table.insert(tabsList, Tab)
 		if group then
 			table.insert(group.Tabs, Tab)
@@ -3526,6 +3716,12 @@ local function buildWindow(opts)
 		refreshCurrent()
 		return Tab
 	end
+	do
+		local rawAddTab = Window.AddTab
+		Window.AddTab = function(self, ...)
+			return rawAddTab(Window, shift(self, Window, ...))
+		end
+	end
 	for _, nm in ipairs(TAB_NAMES) do
 		Window[nm] = Window.AddTab
 	end
@@ -3539,7 +3735,8 @@ local function buildWindow(opts)
 		return defaultTab
 	end
 	for _, nm in ipairs(SECTION_NAMES) do
-		Window[nm] = function(_, so, icon2)
+		Window[nm] = function(self, ...)
+			local so, icon2 = shift(self, Window, ...)
 			return defTab():AddSection(so, icon2)
 		end
 	end
@@ -3549,9 +3746,9 @@ local function buildWindow(opts)
 		if Window[nm] ~= nil or nm == "Toggle" then
 			return
 		end
-		Window[nm] = function(_, ...)
+		Window[nm] = function(self, ...)
 			local t = defTab()
-			return t[nm](t, ...)
+			return t[nm](t, shift(self, Window, ...))
 		end
 	end
 	for kind, names in pairs(KIND_NAMES) do
@@ -3999,6 +4196,50 @@ local function buildWindow(opts)
 		end
 	end))
 
+	installFuzzy(Window, {
+		tab = function()
+			return function(self, ...)
+				return Window.AddTab(Window, shift(self, Window, ...))
+			end
+		end,
+		section = function()
+			return function(self, ...)
+				local so, icon2 = shift(self, Window, ...)
+				return defTab():AddSection(so, icon2)
+			end
+		end,
+		tabbox = function()
+			return function()
+				return defTab():AddTabbox()
+			end
+		end,
+		control = function(kind)
+			return function(self, ...)
+				local t = defTab()
+				return t["Add" .. kind](t, shift(self, Window, ...))
+			end
+		end,
+		divider = function()
+			return function()
+				return defTab():AddDivider()
+			end
+		end,
+		blank = function()
+			return function(self, ...)
+				return defTab():AddBlank(shift(self, Window, ...))
+			end
+		end,
+		notify = function()
+			return function(self, ...)
+				return MacUI.Notify(shift(self, Window, ...))
+			end
+		end,
+		dialog = function()
+			return function(self, ...)
+				return Window.Dialog(Window, shift(self, Window, ...))
+			end
+		end,
+	})
 	table.insert(MacUI._windows, Window)
 	MacUI._theme = Theme -- live table, used by notifications
 	return Window
@@ -4093,5 +4334,14 @@ end
 MacUI.KeybindFrame = { Visible = false }
 MacUI.Watermark = { Visible = false }
 MacUI.Unloaded = false
+
+installFuzzy(MacUI, {
+	window = function()
+		return MacUI.CreateWindow
+	end,
+	notify = function()
+		return MacUI.Notify
+	end,
+})
 
 return MacUI
