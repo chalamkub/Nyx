@@ -14,7 +14,7 @@ local CONFIG = {
     API_URL = "https://zerzy.xyz/api/verify.php", -- only used by the fallback request
     API_MATCH = "verify.php",                     -- a request whose URL contains this is the key check
     FALLBACK_WAIT = 6,                            -- seconds to wait for the main script's key check
-    SERVER_UTC_OFFSET_HOURS = 0,                  -- timezone of dates like "2026-12-01 10:00:00" that carry no timezone
+    SERVER_UTC_OFFSET_HOURS = 7,                  -- timezone of dates like "2026-10-04 10:03:29" that carry no timezone (7 = Thailand time, what zerzy.xyz sends)
     KICK_ON_EXPIRE = false,                       -- kick the player when the key runs out while playing
     DEBUG = true,                                 -- print what the API sent and how the time was worked out (set false when done)
     COLOR = "#FF8A3D", EXPIRED_COLOR = "#FF5252",
@@ -77,10 +77,11 @@ end
 
 -- ---------------------------------------------------------------- find the expiry in the API response
 local EXPIRY_FIELDS = {
+    "expires_in", "expire_in", "expires_after", -- seconds left: independent of any timezone, so it goes first
     "expires_at", "expire_at", "expires", "expiry", "expire", "expiration", "expired_at", "expire_time",
     "valid_until", "end_time", "ends_at", "timeleft", "time_left", "remaining", "seconds_left", "ttl", "duration",
 }
-local RELATIVE_HINTS = { "left", "remain", "ttl", "duration" }
+local RELATIVE_HINTS = { "left", "remain", "ttl", "duration", "_in", "_after" }
 
 local function IsRelativeName(name)
     for _, h in ipairs(RELATIVE_HINTS) do
