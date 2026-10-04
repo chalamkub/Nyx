@@ -192,7 +192,7 @@ local TINT_IMAGE_ICONS = true -- default for icons that do not set Tint themselv
 -- executors / assets do not allow. If it fails you get a warning in the console and the icon stays
 -- as uploaded; in that case upload a white version of the icon instead.
 -- Set Recolor = false on a single icon ({ Id = "123", Recolor = false }) or here to turn it off.
-local RECOLOR_ICONS = true
+local RECOLOR_ICONS = false
 
 -- icon ids by tab name (not case sensitive); filled by MacUI.SetIcons / CreateWindow({ Icons = ... })
 -- Search / Chevron / Close are the small icons used inside the UI and can be replaced the same way.
@@ -1181,6 +1181,51 @@ function MacUI.Destroy()
 	end
 end
 
+local function getGuiParent()
+	local lp = Players.LocalPlayer
+	-- Executor/CoreGui first, then PlayerGui as the normal Roblox fallback.
+	local ok, hui = pcall(function()
+		if type(gethui) == "function" then
+			return gethui()
+		end
+		return nil
+	end)
+	if ok and hui then
+		return hui
+	end
+	local okCore, core = pcall(function()
+		return game:GetService("CoreGui")
+	end)
+	if okCore and core then
+		return core
+	end
+	if lp then
+		return lp:WaitForChild("PlayerGui")
+	end
+	return nil
+end
+
+local function attachGui(gui)
+	local parent = getGuiParent()
+	if not parent then
+		return false
+	end
+	local ok = pcall(function()
+		gui.Parent = parent
+	end)
+	if ok and gui.Parent then
+		return true
+	end
+	local lp = Players.LocalPlayer
+	if lp then
+		local ok2 = pcall(function()
+			gui.Parent = lp:WaitForChild("PlayerGui")
+		end)
+		return ok2 and gui.Parent ~= nil
+	end
+	return false
+end
+
 local function buildWindow(opts)
 	if type(opts) == "string" then
 		opts = { Title = opts }
@@ -1309,11 +1354,9 @@ local function buildWindow(opts)
 		DisplayOrder = 999,
 		ZIndexBehavior = Enum.ZIndexBehavior.Sibling,
 	})
-	local ok = pcall(function()
-		gui.Parent = (gethui and gethui()) or game:GetService("CoreGui")
-	end)
-	if not ok or not gui.Parent then
-		gui.Parent = Players.LocalPlayer:WaitForChild("PlayerGui")
+	if not attachGui(gui) then
+		warn("[MacUI] Could not parent ScreenGui")
+		return nil
 	end
 
 	local main = themed(New("Frame", {
@@ -1325,6 +1368,8 @@ local function buildWindow(opts)
 		ClipsDescendants = true,
 		Parent = gui,
 	}, { Round(12), Stroke("Stroke") }), { BackgroundColor3 = "Window", BackgroundTransparency = "GlassMain" })
+	main.Visible = true
+	main.Active = true
 
 	-- two sizes (yellow button), always limited to what fits on screen
 	local scaleObj = New("UIScale", { Scale = 1, Parent = main })
