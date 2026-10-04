@@ -4396,4 +4396,227 @@ pcall(function()
 	g.MacUI_Library = MacUI
 end)
 
+
+--========================================================--
+-- NYX KEY SYSTEM (integrated; original UI code is unchanged)
+--========================================================--
+local function installNyxKeySystem()
+    local ok, err = pcall(function()
+        local Players = game:GetService("Players")
+        local HttpService = game:GetService("HttpService")
+        local player = Players.LocalPlayer
+        local env = (getgenv and getgenv()) or _G
+
+        env.NyxLibraryKeyRun = (env.NyxLibraryKeyRun or 0) + 1
+        local runId = env.NyxLibraryKeyRun
+        local CFG = {
+            URL = "https://zerzy.xyz/api/verify.php",
+            MATCH = "verify.php",
+            FALLBACK_WAIT = 6,
+            KICK_ON_EXPIRE = true,
+            COLOR = "#FF8A3D",
+            ERROR_COLOR = "#FF5252",
+        }
+
+        local resolved, failed, kicked = false, false, false
+        local endAt = nil
+
+        local function note(value)
+            if env.NyxLibraryKeyRun ~= runId then return end
+            for _, window in ipairs(MacUI._windows) do
+                if type(window) == "table" and type(window.SetUserNote) == "function" then
+                    pcall(function() window:SetUserNote(value) end)
+                end
+            end
+        end
+
+        local function unix(y, m, d, h, mi, s)
+            y = (m <= 2) and y - 1 or y
+            local era = math.floor(y / 400)
+            local yoe = y - era * 400
+            local doy = math.floor((153 * ((m + 9) % 12) + 2) / 5) + d - 1
+            local doe = yoe * 365 + math.floor(yoe / 4) - math.floor(yoe / 100) + doy
+            return (era * 146097 + doe - 719468) * 86400 + h * 3600 + mi * 60 + s
+        end
+
+        local months = {Jan=1,Feb=2,Mar=3,Apr=4,May=5,Jun=6,Jul=7,Aug=8,Sep=9,Oct=10,Nov=11,Dec=12}
+        local function serverNow(headers)
+            if type(headers) == "table" then
+                for k, v in pairs(headers) do
+                    if tostring(k):lower() == "date" then
+                        local d, mon, y, h, mi, s = tostring(v):match("(%d+) (%a+) (%d+) (%d+):(%d+):(%d+)")
+                        if d and months[mon] then return unix(tonumber(y), months[mon], tonumber(d), tonumber(h), tonumber(mi), tonumber(s)) end
+                    end
+                end
+            end
+            return os.time()
+        end
+
+        local function parseDate(v)
+            if type(v) ~= "string" then return nil end
+            local y, mo, d, rest = v:match("^(%d%d%d%d)-(%d%d)-(%d%d)(.*)$")
+            if not y then return nil end
+            local h, mi, s, tail = rest:match("^[T ](%d%d):(%d%d):?(%d*)(.*)$")
+            h, mi, s = tonumber(h) or 23, tonumber(mi) or 59, tonumber(s) or 59
+            local tz = 7 * 3600
+            if tail then
+                local sign, th, tm = tail:match("([%+%-])(%d%d):?(%d%d)$")
+                if sign then tz = (tonumber(th) * 3600 + tonumber(tm) * 60) * (sign == "-" and -1 or 1)
+                elseif tail:match("Z$") then tz = 0 end
+            end
+            return unix(tonumber(y), tonumber(mo), tonumber(d), h, mi, s) - tz
+        end
+
+        local fields = {
+            "expires_in","expire_in","expires_after","expires_at","expire_at","expires",
+            "expiry","expire","expiration","expired_at","expire_time","valid_until",
+            "end_time","ends_at","timeleft","time_left","remaining","seconds_left","ttl","duration"
+        }
+
+        local function remaining(name, value, now)
+            if type(value) == "string" then
+                local low = value:lower()
+                if low == "never" or low == "lifetime" or low == "permanent" or low == "unlimited" then return "lifetime" end
+                local n = tonumber(value)
+                if n then value = n else
+                    local stamp = parseDate(value)
+                    if stamp then return stamp - now end
+                    return nil
+                end
+            end
+            if type(value) ~= "number" then return nil end
+            if value > 1e12 then value = value / 1000 end
+            if value <= 0 then return nil end
+            if name:find("left",1,true) or name:find("remain",1,true) or name:find("ttl",1,true)
+                or name:find("duration",1,true) or name:find("_in",1,true) or name:find("_after",1,true)
+                or value < 1e9 then return value end
+            return value - now
+        end
+
+        local function findExpiry(tbl, now)
+            if type(tbl) ~= "table" then return nil end
+            for _, field in ipairs(fields) do
+                if tbl[field] ~= nil then
+                    local result = remaining(field, tbl[field], now)
+                    if result ~= nil then return result end
+                end
+            end
+        end
+
+        local function accept(data, headers)
+            if resolved or type(data) ~= "table" then return end
+            if data.success ~= true then
+                failed, resolved = true, true
+                note('<font color="' .. CFG.ERROR_COLOR .. '">คีย์ไม่ถูกต้อง</font>')
+                return
+            end
+            local now = serverNow(headers)
+            local left = findExpiry(data, now)
+            if left == nil then left = findExpiry(data.data, now) end
+            if left == nil then left = findExpiry(data.key, now) end
+            resolved = true
+            if left == "lifetime" then
+                endAt = "lifetime"
+            elseif type(left) == "number" and left > 0 then
+                endAt = os.time() + math.floor(left)
+            elseif type(left) == "number" then
+                failed = true
+            else
+                endAt = "unknown"
+            end
+        end
+
+        local function inspect(opts, response)
+            if type(opts) ~= "table" or type(response) ~= "table" then return end
+            local url = tostring(opts.Url or opts.url or "")
+            if not url:find(CFG.MATCH, 1, true) then return end
+            local okJson, data = pcall(function()
+                return HttpService:JSONDecode(response.Body or response.body or "")
+            end)
+            if okJson then accept(data, response.Headers or response.headers) end
+        end
+
+        local function wrap(container, name)
+            if type(container) ~= "table" then return end
+            local original = rawget(container, name)
+            if typeof(original) ~= "function" then return end
+            container[name] = function(...)
+                local args = table.pack(...)
+                local response = original(table.unpack(args, 1, args.n))
+                pcall(inspect, args[1], response)
+                return response
+            end
+        end
+        wrap(env, "request")
+        wrap(env, "http_request")
+        if type(env.syn) == "table" then wrap(env.syn, "request") end
+
+        task.spawn(function()
+            task.wait(CFG.FALLBACK_WAIT)
+            if resolved or env.NyxLibraryKeyRun ~= runId then return end
+            local key = env.Key
+            local requestFn = rawget(env, "request") or rawget(env, "http_request")
+                or (type(env.syn) == "table" and rawget(env.syn, "request"))
+            local hwid
+            local funcs = { gethwid, get_hwid, type(env.syn) == "table" and env.syn.get_hwid or nil }
+            for _, fn in ipairs(funcs) do
+                if typeof(fn) == "function" then
+                    local okH, value = pcall(fn)
+                    if okH and value then hwid = tostring(value); break end
+                end
+            end
+            if not (key and tostring(key) ~= "" and hwid and typeof(requestFn) == "function") then return end
+            local okReq, response = pcall(function()
+                return requestFn({
+                    Url = CFG.URL, Method = "POST",
+                    Headers = {["Content-Type"] = "application/json"},
+                    Body = HttpService:JSONEncode({key = tostring(key), hwid = hwid})
+                })
+            end)
+            if okReq and type(response) == "table" then
+                local okJson, data = pcall(function() return HttpService:JSONDecode(response.Body or response.body or "") end)
+                if okJson then accept(data, response.Headers or response.headers) end
+            end
+        end)
+
+        local function formatTime(seconds)
+            seconds = math.max(0, math.floor(seconds))
+            if seconds <= 0 then return '<font color="' .. CFG.ERROR_COLOR .. '">คีย์หมดอายุ</font>' end
+            return string.format('<font color="%s">คีย์เหลือ %d วัน %02d:%02d:%02d</font>',
+                CFG.COLOR, math.floor(seconds/86400), math.floor((seconds%86400)/3600),
+                math.floor((seconds%3600)/60), seconds%60)
+        end
+
+        task.spawn(function()
+            while env.NyxLibraryKeyRun == runId do
+                if endAt == "lifetime" then
+                    note('<font color="' .. CFG.COLOR .. '">คีย์ถาวร (Lifetime)</font>')
+                elseif endAt == "unknown" then
+                    note('<font color="' .. CFG.COLOR .. '">คีย์ใช้งานได้</font>')
+                elseif type(endAt) == "number" then
+                    local left = endAt - os.time()
+                    note(formatTime(left))
+                    if left <= 0 and CFG.KICK_ON_EXPIRE and not kicked then
+                        kicked = true
+                        note('<font color="' .. CFG.ERROR_COLOR .. '">คีย์หมดอายุ กำลังออกจากเกม...</font>')
+                        task.wait(0.2)
+                        pcall(function() player:Kick("Your key has expired") end)
+                        break
+                    end
+                elseif failed then
+                    note('<font color="' .. CFG.ERROR_COLOR .. '">คีย์ไม่ถูกต้อง</font>')
+                elseif resolved then
+                    note('<font color="' .. CFG.COLOR .. '">ตรวจสอบคีย์แล้ว</font>')
+                else
+                    note('<font color="' .. CFG.COLOR .. '">กำลังตรวจสอบคีย์...</font>')
+                end
+                task.wait(1)
+            end
+        end)
+    end)
+    if not ok then warn("[MacUI Key System] " .. tostring(err)) end
+end
+
+installNyxKeySystem()
+
 return MacUI
