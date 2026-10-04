@@ -1,77 +1,17 @@
+-- Standalone key time-left badge (no MacUI). Paste this AFTER your key check, where `Data` is the decoded API response.
+-- Needs: Data (table from verify.php), LocalPlayer, HttpService (all defined by your key script).
+
 local HttpService = game:GetService("HttpService")
-local LocalPlayer = game:GetService("Players").LocalPlayer
-local API_URL = "https://zerzy.xyz/api/verify.php"
+local Players = game:GetService("Players")
+local UserInputService = game:GetService("UserInputService")
+local LocalPlayer = Players.LocalPlayer
 
-local Key = getgenv().Key
-if not Key or tostring(Key) == "" then
-    LocalPlayer:Kick("Whitelist Key is missing")
-    return
-end
-Key = tostring(Key)
-
-local function GetHWID()
-    local fns = { gethwid, get_hwid, syn and syn.get_hwid }
-    for _, fn in ipairs(fns) do
-        if typeof(fn) == "function" then
-            local ok, result = pcall(fn)
-            if ok and result then return tostring(result) end
-        end
-    end
-end
-
-local HWID = GetHWID()
-if not HWID then
-    LocalPlayer:Kick("Unable to get HWID")
-    return
-end
-
-local RequestFunction = request or http_request or (syn and syn.request)
-if typeof(RequestFunction) ~= "function" then
-    LocalPlayer:Kick("HTTP request is not supported")
-    return
-end
-
-local Response
-local ok = pcall(function()
-    Response = RequestFunction({
-        Url = API_URL,
-        Method = "POST",
-        Headers = { ["Content-Type"] = "application/json" },
-        Body = HttpService:JSONEncode({ key = Key, hwid = HWID })
-    })
-end)
-if not ok or not Response then
-    LocalPlayer:Kick("Whitelist API connection failed")
-    return
-end
-
-local Data
-local DecodeOK = pcall(function()
-    Data = HttpService:JSONDecode(Response.Body or Response.body or "")
-end)
-if not DecodeOK or type(Data) ~= "table" then
-    LocalPlayer:Kick("Invalid API response")
-    return
-end
-
-if Data.success ~= true then
-    LocalPlayer:Kick(tostring(Data.message or "Whitelist verification failed"))
-    return
-end
-
--- =====================================================================
--- Key time left
--- =====================================================================
-
--- 1) Find the expiry in the API response.
---    The server's field name is unknown to this script, so it tries the common names (also inside Data.data).
---    If the timer says "Key active" instead of a time, look at the printed JSON in the console and put the
---    real field name first in the list below.
+-- ---------------------------------------------------------------- 1) find the expiry in the API response
 local EXPIRY_FIELDS = {
     "expires_at", "expire_at", "expires", "expiry", "expire", "expiration", "expired_at", "expire_time",
     "valid_until", "end_time", "ends_at", "timeleft", "time_left", "remaining", "seconds_left", "ttl", "duration",
 }
-local RELATIVE_HINTS = { "left", "remain", "ttl", "duration" } -- field names that hold "seconds from now"
+local RELATIVE_HINTS = { "left", "remain", "ttl", "duration" }
 
 local function IsRelativeName(name)
     for _, h in ipairs(RELATIVE_HINTS) do
@@ -80,7 +20,6 @@ local function IsRelativeName(name)
     return false
 end
 
--- returns: unix time when the key ends, or "lifetime", or nil when nothing was found
 local function ToExpiryTime(name, value)
     local t = type(value)
     if t == "string" then
@@ -92,7 +31,7 @@ local function ToExpiryTime(name, value)
         else
             local iso = string.gsub(value, " ", "T", 1)
             if not string.find(iso, "Z$") and not string.find(iso, "[%+%-]%d%d:?%d%d$") then
-                iso = iso .. "Z" -- a date without a timezone is read as UTC; add the offset yourself if the server uses local time
+                iso = iso .. "Z" -- a date without a timezone is read as UTC
             end
             local good, dt = pcall(function() return DateTime.fromIsoDate(iso) end)
             if good and dt then return dt.UnixTimestamp end
@@ -101,11 +40,9 @@ local function ToExpiryTime(name, value)
     end
     if t == "number" then
         if value <= 0 then return "lifetime" end
-        if value > 1e12 then value = value / 1000 end        -- milliseconds
-        if IsRelativeName(name) or value < 1e9 then          -- seconds from now
-            return os.time() + value
-        end
-        return value                                         -- unix time
+        if value > 1e12 then value = value / 1000 end
+        if IsRelativeName(name) or value < 1e9 then return os.time() + value end
+        return value
     end
     return nil
 end
@@ -124,17 +61,75 @@ if not ExpireAt then
     print("[Key] No expiry field found. API response: " .. HttpService:JSONEncode(Data))
 end
 
--- 2) Load the UI and create the window
-local MacUI = loadstring(game:HttpGet("https://raw.githubusercontent.com/USER/REPO/main/MacUI.lua"))() -- <- your raw link
-local Window = MacUI.CreateWindow({
-    Title = "My Hub",
-    Subtitle = "Primary",
-    -- MaskName = true,   -- show the name as "iM*****"
-})
+-- ---------------------------------------------------------------- 2) the badge (drag it to move)
+local Gui = Instance.new("ScreenGui")
+Gui.Name = "KeyTimer"
+Gui.ResetOnSpawn = false
+Gui.DisplayOrder = 999
+local parented = pcall(function() Gui.Parent = (gethui and gethui()) or game:GetService("CoreGui") end)
+if not parented or not Gui.Parent then Gui.Parent = LocalPlayer:WaitForChild("PlayerGui") end
 
--- 3) Show the time left under your name (bottom left of the sidebar)
+local Badge = Instance.new("Frame")
+Badge.Size = UDim2.fromOffset(190, 48)
+Badge.Position = UDim2.new(0, 16, 1, -64) -- bottom left; change as you like
+Badge.BackgroundColor3 = Color3.fromRGB(41, 45, 54)
+Badge.BorderSizePixel = 0
+Badge.Parent = Gui
+Instance.new("UICorner", Badge).CornerRadius = UDim.new(0, 10)
+local stroke = Instance.new("UIStroke", Badge)
+stroke.Color = Color3.fromRGB(60, 66, 78)
+
+local Avatar = Instance.new("ImageLabel")
+Avatar.Size = UDim2.fromOffset(32, 32)
+Avatar.Position = UDim2.fromOffset(8, 8)
+Avatar.BackgroundColor3 = Color3.fromRGB(60, 66, 78)
+Avatar.BorderSizePixel = 0
+Avatar.Image = "rbxthumb://type=AvatarHeadShot&id=" .. LocalPlayer.UserId .. "&w=150&h=150"
+Avatar.Parent = Badge
+Instance.new("UICorner", Avatar).CornerRadius = UDim.new(1, 0)
+
+local function makeLabel(text, size, font, color, y)
+    local l = Instance.new("TextLabel")
+    l.BackgroundTransparency = 1
+    l.Position = UDim2.fromOffset(48, y)
+    l.Size = UDim2.new(1, -54, 0, 16)
+    l.Text = text
+    l.TextSize = size
+    l.Font = font
+    l.TextColor3 = color
+    l.TextXAlignment = Enum.TextXAlignment.Left
+    l.TextTruncate = Enum.TextTruncate.AtEnd
+    l.RichText = true
+    l.Parent = Badge
+    return l
+end
+local NameLabel = makeLabel(LocalPlayer.DisplayName, 13, Enum.Font.GothamMedium, Color3.fromRGB(236, 239, 246), 7)
+-- NameLabel.Text = string.sub(LocalPlayer.DisplayName, 1, 2) .. "*****"  -- uncomment to mask the name
+local TimeLabel = makeLabel("", 11, Enum.Font.Gotham, Color3.fromRGB(150, 157, 171), 25)
+
+-- drag
+do
+    local dragging, dragStart, startPos
+    Badge.InputBegan:Connect(function(i)
+        if i.UserInputType == Enum.UserInputType.MouseButton1 or i.UserInputType == Enum.UserInputType.Touch then
+            dragging, dragStart, startPos = true, i.Position, Badge.Position
+        end
+    end)
+    UserInputService.InputChanged:Connect(function(i)
+        if dragging and (i.UserInputType == Enum.UserInputType.MouseMovement or i.UserInputType == Enum.UserInputType.Touch) then
+            local d = i.Position - dragStart
+            Badge.Position = UDim2.new(startPos.X.Scale, startPos.X.Offset + d.X, startPos.Y.Scale, startPos.Y.Offset + d.Y)
+        end
+    end)
+    UserInputService.InputEnded:Connect(function(i)
+        if i.UserInputType == Enum.UserInputType.MouseButton1 or i.UserInputType == Enum.UserInputType.Touch then
+            dragging = false
+        end
+    end)
+end
+
+-- ---------------------------------------------------------------- 3) countdown
 local ORANGE, RED = "#FF8A3D", "#FF5252"
-
 local function Format(left)
     if left <= 0 then
         return '<font color="' .. RED .. '">Key expired</font>'
@@ -145,35 +140,24 @@ local function Format(left)
 end
 
 if ExpireAt == "lifetime" then
-    Window:SetUserNote('Expires: <font color="' .. ORANGE .. '">Lifetime</font>')
+    TimeLabel.Text = 'Expires: <font color="' .. ORANGE .. '">Lifetime</font>'
 elseif ExpireAt then
     task.spawn(function()
-        while table.find(MacUI._windows, Window) do -- stops by itself when the UI is closed
+        while Gui.Parent do -- stops by itself if the badge is destroyed
             local left = ExpireAt - os.time()
-            Window:SetUserNote(Format(left))
+            TimeLabel.Text = Format(left)
             if left <= 0 then
-                -- the key has run out while the script was running: add your own action here, e.g.
-                -- LocalPlayer:Kick("Your key has expired")
+                -- LocalPlayer:Kick("Your key has expired") -- optional
                 break
             end
             task.wait(15)
         end
     end)
 else
-    Window:SetUserNote("Key active")
+    TimeLabel.Text = "Key active"
 end
 
--- ใส่โค้ดสคริปต์หลักของคุณต่อจากตรงนี้ (Window:AddTab(...), Tab:AddSection(...) ...)
-
--- ============================================================
---  2SKI Universal Script Hub & Telemetry Loader v3
---  Features:
---    1. Multi-Map Auto-Routing via PlaceId & Central Registry
---    2. Real-Time ID & Telemetry Tracker (Who runs, which map)
---    3. Anti-Environment & Tamper Protection
---    4. Maintenance Killswitch per Game
--- ============================================================
-
+-- to remove the badge later: Gui:Destroy()
 local HttpService = game:GetService("HttpService")
 local Players = game:GetService("Players")
 local StarterGui = game:GetService("StarterGui")
