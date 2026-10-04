@@ -1,10 +1,45 @@
--- Standalone key time-left badge (no MacUI). Paste this AFTER your key check, where `Data` is the decoded API response.
--- Needs: Data (table from verify.php), LocalPlayer, HttpService (all defined by your key script).
+-- Standalone key time-left badge (no MacUI).
+-- Set getgenv().Key = "your key" first (same as your key script), then run this file. See section 0 for the two ways it gets the API data.
 
 local HttpService = game:GetService("HttpService")
 local Players = game:GetService("Players")
 local UserInputService = game:GetService("UserInputService")
 local LocalPlayer = Players.LocalPlayer
+
+-- ---------------------------------------------------------------- 0) get the API response (`Data`)
+-- Option A (no second request): after your key check passes, add  getgenv().KeyData = Data  and run this file.
+-- Option B (this file works alone): it asks the API itself, using getgenv().Key and your HWID.
+local API_URL = "https://zerzy.xyz/api/verify.php"
+
+local Data = getgenv().KeyData
+if type(Data) ~= "table" then
+    local Key = getgenv().Key
+    local RequestFunction = request or http_request or (syn and syn.request)
+    local HWID
+    for _, fn in ipairs({ gethwid, get_hwid, syn and syn.get_hwid }) do
+        if typeof(fn) == "function" then
+            local ok, result = pcall(fn)
+            if ok and result then
+                HWID = tostring(result)
+                break
+            end
+        end
+    end
+    if Key and tostring(Key) ~= "" and HWID and typeof(RequestFunction) == "function" then
+        pcall(function()
+            local Response = RequestFunction({
+                Url = API_URL,
+                Method = "POST",
+                Headers = { ["Content-Type"] = "application/json" },
+                Body = HttpService:JSONEncode({ key = tostring(Key), hwid = HWID })
+            })
+            Data = HttpService:JSONDecode(Response.Body or Response.body or "")
+        end)
+    end
+end
+if type(Data) ~= "table" then
+    Data = {} -- no response: the badge will say "Key active"
+end
 
 -- ---------------------------------------------------------------- 1) find the expiry in the API response
 local EXPIRY_FIELDS = {
@@ -158,6 +193,8 @@ else
 end
 
 -- to remove the badge later: Gui:Destroy()
+
+
 local HttpService = game:GetService("HttpService")
 local Players = game:GetService("Players")
 local StarterGui = game:GetService("StarterGui")
