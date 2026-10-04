@@ -4344,4 +4344,11 @@ installFuzzy(MacUI, {
 	end,
 })
 
+-- lets other scripts (e.g. a key-timer) find the windows of the script that loaded this library without editing it:
+-- getgenv().MacUI_Library._windows
+pcall(function()
+	local g = (getgenv and getgenv()) or _G
+	g.MacUI_Library = MacUI
+end)
+
 return MacUI
