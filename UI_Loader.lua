@@ -317,6 +317,14 @@ local IconDefs = {
 		a.line(3.5, 13.6, 12.5, 13.6, 1.2); a.line(6.4, 13.6, 6.4, 9.5, 1.2); a.line(6.4, 9.5, 9.6, 9.5, 1.2); a.line(9.6, 9.5, 9.6, 13.6, 1.2)
 	end,
 
+	house = function(a)
+		local stroke = 4 / 3
+		a.line(2, 6.7, 8, 2, stroke); a.line(8, 2, 14, 6.7, stroke)
+		a.line(3.3, 6.7, 3.3, 14, stroke); a.line(12.7, 6.7, 12.7, 14, stroke)
+		a.line(3.3, 14, 6, 14, stroke); a.line(10, 14, 12.7, 14, stroke)
+		a.line(6, 8, 6, 14, stroke); a.line(6, 8, 10, 8, stroke); a.line(10, 8, 10, 14, stroke)
+	end,
+
 	sprout = function(a)
 		a.fill(2.2, 9.8, 2.2, 3.6, 0.7)
 		a.fill(5.4, 7.2, 2.2, 6.2, 0.7)
@@ -440,11 +448,11 @@ local IconAlias = {
 	locked = "lock", favorite = "star", power = "bolt", visual = "eye", esp = "eye", files = "folder",
 	cog = "gear", settings2 = "gear", player = "user", users = "user", person = "user", target = "pin",
 	["map-pin"] = "pin", zap = "bolt", ["folder-open"] = "folder", unlock = "lock", key = "lock", flame = "bolt",
-	sparkles = "star", ["sliders-horizontal"] = "gear", wrench = "gear", tool = "gear", house = "home",
+	sparkles = "star", ["sliders-horizontal"] = "gear", wrench = "gear", tool = "gear",
 }
 
--- Lucide icon names are mapped to the closest built-in line icon.
--- Use names such as "lucide:house" or "lucide-house"; direct SVG rendering is not supported.
+-- Lucide icon names are rendered with the closest built-in line drawing.
+-- Use names such as "lucide:house" or "lucide-house"; no image asset is required.
 local LucideIconAlias = {
 	["arrow-left"] = "left", ["arrow-right"] = "right", ["arrow-down-up"] = "updown",
 	["arrow-up-down"] = "updown", ["panel-left"] = "sidebar", ["panel-left-close"] = "sidebar",
@@ -457,7 +465,7 @@ local LucideIconAlias = {
 	["badge-check"] = "shield", check = "shield",
 	["eye-off"] = "eye", ["folder-open"] = "folder", files = "folder",
 	zap = "bolt", activity = "bolt", sparkles = "star", award = "star",
-	leaf = "sprout", ["house-plus"] = "home", ["house-plug"] = "home",
+	leaf = "sprout", ["house-plus"] = "house", ["house-plug"] = "house",
 	swords = "sword", crosshair = "pin", target = "pin",
 	["list-checks"] = "list", ["list-plus"] = "list", ["clipboard-list"] = "list",
 	["lock-keyhole"] = "lock", ["key-round"] = "lock", ["unlock-keyhole"] = "lock",
