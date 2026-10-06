@@ -1,7 +1,6 @@
 local Players = game:GetService("Players")
 local UIS = game:GetService("UserInputService")
 local TweenService = game:GetService("TweenService")
-local AssetService = game:GetService("AssetService")
 
 local win = {}
 
@@ -244,70 +243,6 @@ local function normalizeAsset(id)
 end
 
 ----------------------------------------------------------------------
--- ICON TEXTURES  (set with win.SetIcons or CreateWindow({ Icons = {...} }))
---   Farming = "123456789"                        -> tinted with the theme color
---   Farming = { Id = "123456789", Tint = false } -> shown as-is (colored / black icons)
--- Keys are tab names (not case sensitive). You can add your own tab names too.
--- Search / Chevron / Close / List are the small icons used inside the UI.
-----------------------------------------------------------------------
-local TINT_IMAGE_ICONS = true -- default for icons that do not set Tint themselves
-
--- Black / dark icons cannot take the theme color (ImageColor3 multiplies: black x any color = black).
--- With RECOLOR_ICONS = true the script tries to turn the icon pixels white at runtime (keeping the
--- transparency) so it matches the built-in icons. This needs EditableImage access, which some
--- executors / assets do not allow. If it fails you get a warning in the console and the icon stays
--- as uploaded; in that case upload a white version of the icon instead.
--- Set Recolor = false on a single icon ({ Id = "123", Recolor = false }) or here to turn it off.
-local RECOLOR_ICONS = false
-
--- icon ids by tab name (not case sensitive); filled by win.SetIcons / CreateWindow({ Icons = ... })
--- Search / Chevron / Close are the small icons used inside the UI and can be replaced the same way.
-local TextureIndex = {}
-
-local function registerIcons(tbl)
-	for k, v in pairs(tbl or {}) do
-		if v ~= nil and v ~= "" then
-			TextureIndex[string.lower(k)] = v
-		end
-	end
-end
-
-function win.SetIcons(tbl)
-	registerIcons(tbl)
-end
-
-local function getIconTexture(name)
-	if type(name) ~= "string" then
-		return nil
-	end
-	return TextureIndex[string.lower(name)]
-end
-
--- returns the configured texture for `name`, otherwise `fallback`
--- built-in image ids for the header icons (override with Icons = { Back = "id", Forward = "id" })
-local DefaultUiIcons = {
-	back = "96033474959771",     -- chevron-left
-	forward = "73855156790773",  -- chevron-right
-}
-
-local function getConfiguredIcon(name, fallback)
-	return getIconTexture(name) or DefaultUiIcons[string.lower(name)] or fallback
-end
-
-local function isAssetLike(x)
-	if type(x) == "table" then
-		return x.Id ~= nil
-	end
-	if type(x) ~= "string" then
-		return false
-	end
-	local str = tostring(x)
-	return string.match(str, "^%d+$") ~= nil
-		or string.find(str, "rbxasset", 1, true) ~= nil
-		or string.find(str, "http", 1, true) ~= nil
-end
-
-----------------------------------------------------------------------
 -- drawn icons (16x16 grid) - used when no texture id is set
 ----------------------------------------------------------------------
 local IconDefs = {
@@ -544,89 +479,9 @@ local function buildIcon(name, parent, size)
 	return { Root = root, Parts = parts, Kind = "drawn" }
 end
 
--- Turns every pixel of an icon white (alpha untouched) so ImageColor3 can tint it.
--- Result is cached per image; returns a Content for ImageLabel.ImageContent, or nil on failure.
-local RecolorCache = {}
-local function getWhiteContent(assetUrl)
-	local cached = RecolorCache[assetUrl]
-	if cached == "pending" then
-		while RecolorCache[assetUrl] == "pending" do
-			task.wait(0.05)
-		end
-		cached = RecolorCache[assetUrl]
-	elseif cached == nil then
-		RecolorCache[assetUrl] = "pending"
-		local ok, result = pcall(function()
-			local assetId = tonumber(string.match(assetUrl, "%d+"))
-			local content = Content.fromAssetId(assetId)
-			local img = AssetService:CreateEditableImageAsync(content)
-			local size = img.Size
-			local buf = img:ReadPixelsBuffer(Vector2.zero, size)
-			local len = buffer.len(buf)
-			for i = 0, len - 4, 4 do
-				buffer.writeu8(buf, i, 255)
-				buffer.writeu8(buf, i + 1, 255)
-				buffer.writeu8(buf, i + 2, 255)
-				if i % 262144 == 0 then
-					task.wait()
-				end
-			end
-			img:WritePixelsBuffer(Vector2.zero, size, buf)
-			return img
-		end)
-		if ok and result then
-			RecolorCache[assetUrl] = result
-		else
-			RecolorCache[assetUrl] = false
-			warn("[MacUI] Could not recolor icon " .. tostring(assetUrl)
-				.. " (EditableImage blocked or not allowed for this asset). "
-				.. "Upload a white version of the icon, or set Tint = false. Reason: " .. tostring(result))
-		end
-		cached = RecolorCache[assetUrl]
-	end
-	if cached then
-		return Content.fromObject(cached)
-	end
-	return nil
-end
-
--- icon can be: texture id string / rbxassetid / { Id = , Tint = , Recolor = } / built-in name / emoji text
+-- Icons are drawn locally; no image asset is needed.
 local function makeIcon(parent, icon, size)
 	size = size or 16
-
-	if isAssetLike(icon) then
-		local id, tint, recolor
-		if type(icon) == "table" then
-			id, tint, recolor = normalizeAsset(icon.Id), icon.Tint, icon.Recolor
-		else
-			id = normalizeAsset(icon)
-		end
-		if tint == nil then
-			tint = TINT_IMAGE_ICONS
-		end
-		if recolor == nil then
-			recolor = RECOLOR_ICONS
-		end
-		local image = New("ImageLabel", {
-			Name = "Icon",
-			BackgroundTransparency = 1,
-			BorderSizePixel = 0,
-			Image = id,
-			ImageColor3 = Color3.new(1, 1, 1),
-			ScaleType = Enum.ScaleType.Fit,
-			Size = UDim2.fromOffset(size, size),
-			Parent = parent,
-		})
-		if tint and recolor then
-			task.spawn(function()
-				local content = getWhiteContent(id)
-				if content and image.Parent then
-					image.ImageContent = content
-				end
-			end)
-		end
-		return { Kind = "image", Root = image, Tint = tint }
-	end
 
 	if type(icon) ~= "string" then
 		icon = "list"
@@ -635,7 +490,7 @@ local function makeIcon(parent, icon, size)
 	if name then
 		return buildIcon(name, parent, size)
 	end
-	if #icon > 1 and string.match(icon, "^[%w_%-%.]+$") then
+	if #icon > 1 and string.match(icon, "^[%w_%-%.:/]+$") then
 		return buildIcon("list", parent, size) -- an icon name this library does not draw (not an emoji)
 	end
 
@@ -664,12 +519,6 @@ local function tintIcon(ic, color)
 			else
 				p.Inst.Color = color
 			end
-		end
-	elseif ic.Kind == "image" then
-		-- ImageColor3 multiplies the image color: a white icon takes the theme color,
-		-- a black icon stays black. Use Tint = false for colored / black icons.
-		if ic.Tint ~= false then
-			ic.Root.ImageColor3 = color
 		end
 	else
 		ic.Root.TextColor3 = color
@@ -1390,7 +1239,6 @@ local function buildWindow(opts)
 			end
 		end
 	end
-	registerIcons(opts.Icons)
 	local WIDTH, HEIGHT, SIDE = 560, 370, 150
 	local UDIM2 = "UDim2"
 	if typeof(opts.Size) == UDIM2 and opts.Size.X.Offset > 0 and opts.Size.Y.Offset > 0 then
@@ -1477,9 +1325,9 @@ local function buildWindow(opts)
 		return themed(New("TextLabel", base), { TextColor3 = key or "Text" })
 	end
 
-	-- small UI icons (search / chevron / close) also use IconTextures when set
-	local function uiIcon(parent, key, fallbackName, size)
-		return makeIcon(parent, getConfiguredIcon(key, fallbackName), size)
+	-- Small UI icons (search / chevron / close) use built-in drawings.
+	local function uiIcon(parent, iconName, size)
+		return makeIcon(parent, iconName, size)
 	end
 
 	-- gui root
@@ -1767,7 +1615,7 @@ local function buildWindow(opts)
 		Size = UDim2.new(1, -170, 1, 0),
 		Parent = topbar,
 	})
-	local function navButton(x, key, iconName, onClick)
+	local function navButton(x, iconName, onClick)
 		local hit = New("TextButton", {
 			Text = "",
 			AutoButtonColor = false,
@@ -1779,31 +1627,13 @@ local function buildWindow(opts)
 		animateButton(hit, function()
 			return Theme.Accent
 		end)
-		local ic = uiIcon(hit, key, iconName, 18)
+		local ic = uiIcon(hit, iconName, 18)
 		ic.Root.AnchorPoint = Vector2.new(0.5, 0.5)
 		ic.Root.Position = UDim2.fromScale(0.5, 0.5)
-		-- if an image id cannot load (wrong id / not an Image asset), fall back to the drawn icon
-		local fb
-		if ic.Kind == "image" then
-			fb = makeIcon(hit, iconName, 18)
-			fb.Root.AnchorPoint = Vector2.new(0.5, 0.5)
-			fb.Root.Position = UDim2.fromScale(0.5, 0.5)
-			fb.Root.Visible = false
-			task.delay(5, function()
-				if ic.Root.Parent and not ic.Root.IsLoaded then
-					ic.Root.Visible = false
-					fb.Root.Visible = true
-					warn("[MacUI] Header icon '" .. tostring(key) .. "' did not load. Use an Image asset id (not a Decal id).")
-				end
-			end)
-		end
 		local enabled, hover = true, false
 		local function paint()
 			local c = (not enabled) and Theme.Off:Lerp(Theme.SubText, 0.5) or (hover and Theme.Accent or Theme.Text)
 			tintIcon(ic, c)
-			if fb then
-				tintIcon(fb, c)
-			end
 		end
 		table.insert(hooks, paint)
 		paint()
@@ -1836,17 +1666,17 @@ local function buildWindow(opts)
 		}
 	end
 	local backBtn, fwdBtn
-	navButton(14, "Sidebar", "sidebar", function()
+	navButton(14, "sidebar", function()
 		if onToggleSidebar then
 			onToggleSidebar()
 		end
 	end)
-	backBtn = navButton(36, "Back", "left", function()
+	backBtn = navButton(36, "left", function()
 		if navStep then
 			navStep(-1)
 		end
 	end)
-	fwdBtn = navButton(57, "Forward", "right", function()
+	fwdBtn = navButton(57, "right", function()
 		if navStep then
 			navStep(1)
 		end
@@ -1891,7 +1721,7 @@ local function buildWindow(opts)
 	}, { Round(7) }), { BackgroundColor3 = "Field", BackgroundTransparency = "GlassField" })
 	table.insert(noDrag, searchFrame)
 	do
-		local si = uiIcon(searchFrame, "Search", "search", 14)
+		local si = uiIcon(searchFrame, "search", 14)
 		si.Root.AnchorPoint = Vector2.new(0, 0.5)
 		si.Root.Position = UDim2.fromOffset(9, 14)
 		themedIcon(si, "SubText")
@@ -1926,7 +1756,7 @@ local function buildWindow(opts)
 		return Theme.Accent
 	end)
 	do
-		local ci = uiIcon(clearBtn, "Close", "close", 12)
+		local ci = uiIcon(clearBtn, "close", 12)
 		ci.Root.AnchorPoint = Vector2.new(0.5, 0.5)
 		ci.Root.Position = UDim2.fromScale(0.5, 0.5)
 		themedIcon(ci, "SubText")
@@ -2248,12 +2078,8 @@ local function buildWindow(opts)
 		local c = selected and Theme.SelectedText or Theme.SubText
 		tab.Text.TextColor3 = c
 		tab.Bar.Visible = selected
-		if tab.Icon and not tab.NoTint then
+		if tab.Icon then
 			tintIcon(tab.Icon, selected and c or Theme.SubText:Lerp(Theme.Text, 0.4))
-		end
-		-- untinted image icons: dim them when the tab is not selected
-		if tab.Icon and tab.Icon.Kind == "image" and (tab.NoTint or tab.Icon.Tint == false) then
-			tab.Icon.Root.ImageTransparency = selected and 0 or 0.3
 		end
 	end
 
@@ -2973,7 +2799,7 @@ local function buildWindow(opts)
 				Size = UDim2.new(1, -30, 1, 0),
 				Parent = btn,
 			}, "Text")
-			local chev = uiIcon(btn, "Chevron", "updown", 14)
+			local chev = uiIcon(btn, "updown", 14)
 			chev.Root.AnchorPoint = Vector2.new(1, 0.5)
 			chev.Root.Position = UDim2.new(1, -6, 0.5, 0)
 			themedIcon(chev, "SubText")
@@ -3826,16 +3652,9 @@ local function buildWindow(opts)
 			Parent = btn,
 		}, { Round(2) }), { BackgroundColor3 = "Accent" })
 
-		-- icon priority: explicit asset id > IconTextures[tab name] > IconTextures[icon name] > built-in drawn icon
-		local iconSource
-		if isAssetLike(o.Icon) then
-			iconSource = o.Icon
-		else
-			iconSource = getIconTexture(o.Name) or getIconTexture(o.Icon) or o.Icon
-		end
 		local icon
-		if iconSource then
-			icon = makeIcon(btn, iconSource, 17)
+		if o.Icon then
+			icon = makeIcon(btn, o.Icon, 17)
 			icon.Root.AnchorPoint = Vector2.new(0, 0.5)
 			icon.Root.Position = UDim2.new(0, 11, 0.5, 0)
 		end
@@ -3871,7 +3690,7 @@ local function buildWindow(opts)
 		themed(page, { ScrollBarImageColor3 = "Off" })
 
 		local Tab = {
-			Name = o.Name, Btn = btn, Text = text, Icon = icon, Bar = bar, NoTint = o.NoTint,
+			Name = o.Name, Btn = btn, Text = text, Icon = icon, Bar = bar,
 			Page = page, _sections = {}, _order = 0, HasMatch = true,
 		}
 		function Tab:AddSection(so, icon2)
