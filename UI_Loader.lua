@@ -320,9 +320,14 @@ local IconDefs = {
 	house = function(a)
 		local stroke = 4 / 3
 		a.line(2, 6.7, 8, 2, stroke); a.line(8, 2, 14, 6.7, stroke)
-		a.line(3.3, 6.7, 3.3, 14, stroke); a.line(12.7, 6.7, 12.7, 14, stroke)
+		a.line(2, 6.7, 2, 12.7, stroke); a.line(14, 6.7, 14, 12.7, stroke)
+		a.line(2, 12.7, 2.4, 13.4, stroke); a.line(2.4, 13.4, 3.3, 14, stroke)
 		a.line(3.3, 14, 6, 14, stroke); a.line(10, 14, 12.7, 14, stroke)
-		a.line(6, 8, 6, 14, stroke); a.line(6, 8, 10, 8, stroke); a.line(10, 8, 10, 14, stroke)
+		a.line(12.7, 14, 13.6, 13.4, stroke); a.line(13.6, 13.4, 14, 12.7, stroke)
+		a.line(6, 14, 6, 9.5, stroke); a.line(6, 9.5, 6.4, 8.9, stroke)
+		a.line(6.4, 8.9, 7, 8.7, stroke); a.line(7, 8.7, 9, 8.7, stroke)
+		a.line(9, 8.7, 9.6, 8.9, stroke); a.line(9.6, 8.9, 10, 9.5, stroke)
+		a.line(10, 9.5, 10, 14, stroke)
 	end,
 
 	sprout = function(a)
