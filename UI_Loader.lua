@@ -2253,6 +2253,7 @@ local function buildWindow(opts)
 
 	-- two sizes (yellow button), always limited to what fits on screen
 	local scaleObj = New("UIScale", { Scale = 1, Parent = main })
+	local openAnimScale = New("UIScale", { Scale = 1, Parent = main })
 	local currentScale = 1
 	local scaleSlider
 	local fitMax = 1.5
@@ -2728,11 +2729,36 @@ local function buildWindow(opts)
 	local toggleBindCtl -- the "Toggle UI" row in the settings tab (kept in sync)
 
 	local refreshCurrent -- assigned after selectTab exists
-	local function toggleMain()
-		main.Visible = not main.Visible
-		if main.Visible and refreshCurrent then
-			refreshCurrent()
+	local openAnimTween
+	local function setMainVisible(visible)
+		if main.Visible == visible then
+			return
 		end
+		main.Visible = visible
+		if visible then
+			if refreshCurrent then
+				refreshCurrent()
+			end
+			if openAnimTween then
+				openAnimTween:Cancel()
+			end
+			openAnimScale.Scale = 0.88
+			openAnimTween = TweenService:Create(
+				openAnimScale,
+				TweenInfo.new(0.3, Enum.EasingStyle.Back, Enum.EasingDirection.Out),
+				{ Scale = 1 }
+			)
+			openAnimTween:Play()
+		else
+			if openAnimTween then
+				openAnimTween:Cancel()
+				openAnimTween = nil
+			end
+			openAnimScale.Scale = 1
+		end
+	end
+	local function toggleMain()
+		setMainVisible(not main.Visible)
 	end
 
 	-- dragging (window, open button, sliders)
@@ -4958,7 +4984,7 @@ local function buildWindow(opts)
 		if opts.ConfirmClose == false then
 			win:Destroy()
 		else
-			main.Visible = true
+			setMainVisible(true)
 			confirm.Visible = true
 		end
 	end
@@ -5204,7 +5230,7 @@ local function buildWindow(opts)
 	end)
 	onPress(green, function()
 		confirm.Visible = false
-		main.Visible = false
+		setMainVisible(false)
 	end)
 	onPress(cancelBtn, function()
 		confirm.Visible = false
