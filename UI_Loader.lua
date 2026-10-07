@@ -2742,10 +2742,10 @@ local function buildWindow(opts)
 			if openAnimTween then
 				openAnimTween:Cancel()
 			end
-			openAnimScale.Scale = 0.88
+			openAnimScale.Scale = 0.94
 			openAnimTween = TweenService:Create(
 				openAnimScale,
-				TweenInfo.new(0.3, Enum.EasingStyle.Back, Enum.EasingDirection.Out),
+				TweenInfo.new(0.32, Enum.EasingStyle.Quint, Enum.EasingDirection.Out),
 				{ Scale = 1 }
 			)
 			openAnimTween:Play()
