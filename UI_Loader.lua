@@ -2674,7 +2674,7 @@ local function buildWindow(opts)
 		AutoButtonColor = false,
 		BackgroundTransparency = 1,
 		BorderSizePixel = 0,
-		Position = UDim2.new(0, 16, 0.5, -26),
+		Position = UDim2.new(0, 46, 0.5, -56)),
 		Size = UDim2.fromOffset(52, 52),
 		Parent = gui,
 	})
